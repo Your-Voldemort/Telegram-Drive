@@ -270,6 +270,7 @@ interface AuthPasswordStepProps {
 }
 
 export function AuthPasswordStep({ password, loading, onPasswordChange, onSubmit, onBack }: AuthPasswordStepProps) {
+    useTranslation();
   return (
     <motion.form key="password" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-2">
@@ -283,7 +284,7 @@ export function AuthPasswordStep({ password, loading, onPasswordChange, onSubmit
         </div>
       </div>
       <div className="flex flex-col gap-3">
-        <button type="submit" disabled={loading || !password} className="quiet-control auth-primary-action disabled:opacity-45">{loading ? 'Verifying...' : 'Unlock'}</button>
+        <button type="submit" disabled={loading || !password} className="quiet-control auth-primary-action disabled:opacity-45">{loading ? i18n.t("auth.verifying") : 'Unlock'}</button>
         <button type="button" onClick={onBack} className="quiet-control auth-secondary-action w-full">{i18n.t("auth.back_to_code")}</button>
       </div>
     </motion.form>

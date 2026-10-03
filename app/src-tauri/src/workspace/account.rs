@@ -87,7 +87,7 @@ fn session_file_identity(path: &Path) -> std::io::Result<(u64, u64)> {
 }
 
 #[cfg(target_os = "windows")]
-fn session_file_identity(path: &Path) -> std::io::Result<(u64, u64)> {
+pub(crate) fn session_file_identity(path: &Path) -> std::io::Result<(u64, u64)> {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
         GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
@@ -264,6 +264,9 @@ pub fn suspend() {
         .lock()
         .unwrap_or_else(|error| error.into_inner());
     LIFECYCLE.suspend();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    drop(_sessions);
+    crate::local_search::invalidate();
 }
 
 pub fn resume() {
@@ -401,6 +404,11 @@ pub struct AccountGuard {
 }
 
 impl AccountGuard {
+    /// Compare captured sessions without opening SQLite under another lock.
+    pub(crate) fn same_session(&self, other: &Self) -> bool {
+        self.root == other.root && self.owner == other.owner && self.generation == other.generation
+    }
+
     pub fn open(root: &Path, expected: Option<&str>) -> Result<Self, String> {
         let generation = LIFECYCLE.generation.load(Ordering::SeqCst);
         let owner = current_owner(root)?;

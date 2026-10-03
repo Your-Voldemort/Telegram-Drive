@@ -1,4 +1,3 @@
-import '../../../i18n/supporterTranslations';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Heart, X } from 'lucide-react';
 import { useSupporter } from '../../../context/SupporterContext';
@@ -8,12 +7,11 @@ import {
   sponsorAdCooldownRemaining,
 } from '../../../services/supporterVisibility';
 import i18n from '../../../i18n';
+import { localSponsorOrigin } from '../../../services/localMediaServer';
 
 const AUTO_DISMISS_SECONDS = 10;
 const AD_LOAD_TIMEOUT_MS = 12_000;
 const LEGACY_DISMISSED_AT_KEY = 'desktopAdDismissedAt';
-const AD_IFRAME_ORIGIN = 'http://localhost:14201';
-const AD_IFRAME_URL = `${AD_IFRAME_ORIGIN}/ad-banner`;
 const AD_STATUS_MESSAGE = 'telegram-drive:ad-banner-status';
 const AD_LINK_MESSAGE = 'telegram-drive:ad-link';
 
@@ -46,7 +44,23 @@ export function DesktopAdBanner({ suppressed = false, onSupport, onManualDismiss
   const [countdown, setCountdown] = useState(AUTO_DISMISS_SECONDS);
   const [loadStatus, setLoadStatus] = useState<AdLoadStatus>(isPreview ? 'loaded' : 'loading');
   const [cycle, setCycle] = useState(0);
+  // The selected sponsor listener is resolved
+  // before the frame is created so the message check below always compares
+  // against the port that is really serving it.
+  const [resolvedFrame, setResolvedFrame] = useState<{cycle: number; origin: string | null} | null>(null);
+  const frameOrigin = resolvedFrame?.cycle === cycle ? resolvedFrame.origin : null;
   const eligible = !suppressed && shouldShowSponsorContent(supporterStatus);
+
+  useEffect(() => {
+    if (!eligible || isPreview) return;
+    let cancelled = false;
+    void localSponsorOrigin().then(origin => {
+      if (cancelled) return;
+      setResolvedFrame({cycle, origin});
+      if (origin === null) setLoadStatus('fallback');
+    });
+    return () => { cancelled = true; };
+  }, [cycle, eligible, isPreview]);
 
   // Older builds persisted the cooldown across restarts. A fresh app session is
   // always a fresh display opportunity, so remove that legacy state once.
@@ -95,11 +109,16 @@ export function DesktopAdBanner({ suppressed = false, onSupport, onManualDismiss
   }, []);
 
   useEffect(() => {
-    if (!eligible || !visible || isPreview) return;
-
+    if (!eligible || !visible || isPreview || loadStatus !== 'loading') return;
     const timeout = window.setTimeout(() => setLoadStatus('fallback'), AD_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [cycle, eligible, isPreview, loadStatus, visible]);
+
+  useEffect(() => {
+    if (!eligible || !visible || isPreview || frameOrigin === null) return;
+
     const receiveStatus = (event: MessageEvent<unknown>) => {
-      if (event.origin !== AD_IFRAME_ORIGIN || event.source !== iframeRef.current?.contentWindow) return;
+      if (event.origin !== frameOrigin || event.source !== iframeRef.current?.contentWindow) return;
       if (!event.data || typeof event.data !== 'object') return;
 
       const message = event.data as { type?: unknown; status?: unknown; url?: unknown };
@@ -114,20 +133,15 @@ export function DesktopAdBanner({ suppressed = false, onSupport, onManualDismiss
       if (message.type !== AD_STATUS_MESSAGE) return;
 
       if (message.status === 'loaded') {
-        window.clearTimeout(timeout);
         setLoadStatus('loaded');
       } else if (message.status === 'failed') {
-        window.clearTimeout(timeout);
         setLoadStatus('fallback');
       }
     };
 
     window.addEventListener('message', receiveStatus);
-    return () => {
-      window.clearTimeout(timeout);
-      window.removeEventListener('message', receiveStatus);
-    };
-  }, [cycle, eligible, isPreview, visible]);
+    return () => window.removeEventListener('message', receiveStatus);
+  }, [cycle, eligible, frameOrigin, isPreview, visible]);
 
   useEffect(() => {
     if (!eligible || !visible || exiting || isPreview || loadStatus === 'loading') return;
@@ -148,13 +162,13 @@ export function DesktopAdBanner({ suppressed = false, onSupport, onManualDismiss
   return (
     <aside
       role="complementary"
-      aria-label={`Sponsored advertisement — closes automatically in ${countdown} seconds`}
+      aria-label={i18n.t("ads.auto_close_label",{seconds:countdown})}
       className={`fixed bottom-4 end-4 z-40 w-[300px] overflow-hidden rounded-container border border-app-border bg-app-surface-raised shadow-[var(--shadow-floating)] transition-all duration-200 motion-reduce:transition-none ${exiting ? 'translate-y-2 opacity-0' : 'opacity-100'}`}
     >
       <header className="flex min-h-10 items-center gap-2 border-b border-app-border-subtle px-3 py-2">
         <span className="sponsored-label border-0 px-0">{i18n.t("ads.sponsored")}</span>
         <span className="min-w-0 flex-1 truncate text-metadata text-app-text-secondary">
-          {loadStatus === 'loading' ? 'Loading…' : `Closes in ${countdown}s`}
+          {loadStatus === 'loading' ? i18n.t('common.loading') : i18n.t('ads.closes_in',{seconds:countdown})}
         </span>
         <button type="button" onClick={() => dismiss(true)} className="quiet-control p-1.5 text-app-text-secondary hover:text-app-text" aria-label={i18n.t("ads.close_ad")}>
           <X className="h-3.5 w-3.5" />
@@ -188,16 +202,16 @@ export function DesktopAdBanner({ suppressed = false, onSupport, onManualDismiss
                 <span className="text-metadata text-app-accent">{i18n.t("ads.sponsored")}</span>
               </button>
             )}
-            <iframe
+            {frameOrigin !== null && <iframe
               ref={iframeRef}
-              src={`${AD_IFRAME_URL}?cycle=${cycle}`}
+              src={`${frameOrigin}/ad-banner?cycle=${cycle}`}
               sandbox="allow-scripts allow-same-origin"
               title={i18n.t("ads.sponsored")}
               width={300}
               height={250}
               className={`relative border-0 bg-transparent transition-opacity duration-200 ${loadStatus === 'loaded' ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
               onError={() => setLoadStatus('fallback')}
-            />
+            />}
           </>
         )}
       </div>
@@ -210,7 +224,7 @@ export function DesktopAdBanner({ suppressed = false, onSupport, onManualDismiss
       )}
 
       <div aria-live="polite" className="sr-only">
-        {loadStatus === 'loading' ? 'Advertisement loading' : `Advertisement closes in ${countdown} seconds`}
+        {loadStatus === 'loading' ? i18n.t('common.loading') : i18n.t('ads.auto_close_label',{seconds:countdown})}
       </div>
     </aside>
   );

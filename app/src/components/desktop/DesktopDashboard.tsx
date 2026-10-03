@@ -1,5 +1,6 @@
+import { clearImageMemoryCaches } from '../../services/imagePreviewCache';
 import { sourceFolder } from '../../services/fileIdentity';
-import { lazy, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { lazy, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { ORGANIZE_FILES_EVENT } from '../../services/workspace';
 import { AnimatePresence } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -56,7 +57,7 @@ import { DEFAULT_SEARCH_FILTERS, filterAndRankFiles, type FileSearchFilters } fr
 import { useSupporterPrompt } from '../../hooks/useSupporterPrompt';
 import { type SupporterPromptTrigger } from '../../services/supporterVisibility';
 import { markDesktopFrontendReady, markDesktopFrontendUnready, type DesktopNavigationRequest } from '../../services/desktopLifecycle';
-import { fileQueryKey, refreshFolderFiles, updateFileQueryData } from '../../services/fileListRefresh';
+import { fileQueryKey, invalidateFolderFileQueries, refreshFolderFiles, updateFileQueryData } from '../../services/fileListRefresh';
 import { getAdjacentPreview, previewFileKey, samePreviewFile as sameFile } from '../../services/previewNavigation';
 import i18n from '../../i18n';
 
@@ -91,6 +92,17 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
     } = useTelegramConnection(onLogout);
 
 
+    useEffect(() => {
+        let closed = false;
+        let stop: (() => void) | undefined;
+        void listen<{ ownerId: string; folderId: number | null }>('file-inventory-changed', ({ payload }) => {
+            if (closed || payload.ownerId !== accountId) return;
+            clearImageMemoryCaches();
+            void queryClient.invalidateQueries({ queryKey: fileQueryKey(payload.ownerId, payload.folderId), exact: true });
+        }).then(unlisten => { if (closed) unlisten(); else stop = unlisten; });
+        return () => { closed = true; stop?.(); };
+    }, [accountId, queryClient]);
+
     const { settings, updateSetting, updateSettings, isLoaded: settingsLoaded } = useSettings();
     const captureMutationScope = useActionScope(accountId);
     const { status: supporterStatus } = useSupporter();
@@ -121,9 +133,10 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
     const [supporterOfferTrigger, setSupporterOfferTrigger] = useState<SupporterPromptTrigger | null>(null);
     const [createFolderRequest, setCreateFolderRequest] = useState(0);
     const [activeSmartView, setActiveSmartView] = useState<SmartView | null>('recents');
+    const [insightSummary, setInsightSummary] = useState<{ scope: string; count: number; complete: boolean } | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [searchFilters, setSearchFilters] = useState<FileSearchFilters>(DEFAULT_SEARCH_FILTERS);
-    const { results: searchResults, isSearching } = useGlobalFileSearch(searchTerm, searchFilters.scope, accountId);
+    const { results: searchResults, isSearching, reply: searchReply, error: searchError } = useGlobalFileSearch(searchTerm, searchFilters, accountId);
     const [folderSyncProgress, setFolderSyncProgress] = useState({ active: false, count: 0 });
     const fileLoadSequenceRef = useRef(0);
     const fileLoadScope = JSON.stringify([accountId, activeSmartView, activeFolderId]);
@@ -135,6 +148,37 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
         setFolderSyncProgress({ active: false, count: 0 });
         return () => { fileLoadSequenceRef.current++; };
     }, [fileLoadScope]);
+    useEffect(() => {
+        if (!accountId || activeSmartView) return;
+        let disposed = false;
+        const touch = () => {
+            void invoke<boolean>('cmd_touch_file_inventory', { ownerId: accountId, folderId: activeFolderId }).then(present => {
+                if (!present && !disposed) void invalidateFolderFileQueries(queryClient, activeFolderId, accountId);
+            }).catch(() => {});
+        };
+        touch();
+        const timer = window.setInterval(touch, 60_000);
+        return () => { disposed = true; window.clearInterval(timer); };
+    }, [accountId, activeFolderId, activeSmartView, queryClient]);
+    useEffect(() => {
+        let disposed = false;
+        let stop: (() => void) | undefined;
+        void listen('vault-locked', () => {
+            if (disposed) return;
+            fileLoadScopeRef.current.generation++;
+            fileLoadSequenceRef.current++;
+            setPreviewFile(file => file?.encryption_state === 'encrypted_unlocked' ? null : file);
+            setMoveRequest(null);
+            setFolderSyncProgress({ active: false, count: 0 });
+            void queryClient.cancelQueries({ queryKey: ['files'] }).then(() => {
+                if (disposed) return;
+                queryClient.setQueriesData<TelegramFile[]>({ queryKey: ['files'] }, files =>
+                    files?.filter(file => file.encryption_state !== 'encrypted_unlocked'));
+                void queryClient.invalidateQueries({ queryKey: ['files'] });
+            });
+        }).then(unlisten => { if (disposed) unlisten(); else stop = unlisten; });
+        return () => { disposed = true; stop?.(); };
+    }, [queryClient]);
     const [cardScale, setCardScale] = useState(1.0);
     const sortField: SortField = settings.fileSortField;
     const sortDirection: SortDirection = settings.fileSortDirection;
@@ -240,6 +284,8 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                         largeThresholdBytes: 100 * 1024 * 1024,
                         oldFileDays: 365,
                     });
+                    check();
+                    setInsightSummary({ scope: fileLoadScope, count: insight.scanned_count, complete: insight.complete });
                     localFiles = insight.files;
                 } else {
                     localFiles = await invoke<TelegramFile[]>('cmd_get_file_activity', { ownerId: accountId, view: activeSmartView, limit: 250 });
@@ -266,13 +312,12 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
     });
 
     const displayedFiles = useMemo(() => {
-        const source = searchTerm.trim().length >= 2 && searchFilters.scope === 'all'
-            ? [...allFiles, ...searchResults].filter((file, index, values) => values.findIndex((candidate) => candidate.id === file.id && candidate.folder_id === file.folder_id) === index)
-            : allFiles;
-        return filterAndRankFiles(source, searchTerm, searchFilters);
+        if (searchFilters.scope === 'all') return searchResults;
+        return filterAndRankFiles(allFiles, searchTerm, searchFilters);
     }, [allFiles, searchResults, searchTerm, searchFilters]);
     const isCrossFolderView = activeSmartView !== null
-        || (searchFilters.scope === 'all' && searchTerm.trim().length >= 2);
+        || searchFilters.scope === 'all';
+    useEffect(() => { if (isCrossFolderView) setSelectedIds([]); }, [isCrossFolderView]);
 
     const handleManualSync = useCallback(async () => {
         await handleSyncFolders();
@@ -362,7 +407,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
     }, [selectedIds, displayedFiles, setActiveFolderId]);
 
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         lastClickedIndexRef.current = -1;
         setSelectedIds([]);
         setMoveRequest(null);
@@ -373,7 +418,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
         setPreviewContextFiles([]);
         setPreviewContextIndex(-1);
         setArchiveViewFile(null);
-    }, [activeFolderId, activeSmartView]);
+    }, [accountId, activeFolderId, activeSmartView]);
 
 
     const lastClickedIndexRef = useRef<number>(-1);
@@ -722,8 +767,8 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
             predicate: query => query.queryKey[query.queryKey.length - 1] === accountId,
         });
         toast.success(flag === 'favorite'
-            ? (nextValue ? 'Added to Favorites' : 'Removed from Favorites')
-            : (nextValue ? 'Pinned' : 'Unpinned'));
+            ? (nextValue ? i18n.t('navigation_copy.favorite_added') : i18n.t('navigation_copy.favorite_removed'))
+            : (nextValue ? i18n.t("common.pinned") : i18n.t('navigation_copy.unpinned')));
         } catch {
             if (generation === fileLoadScopeRef.current.generation) toast.error(t('common.operation_failed'));
         }
@@ -826,9 +871,9 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                         const info = await handleExportFolderInvite(id);
                         try {
                             await copyToClipboard(info.link);
-                            toast.success(`Invite link copied: ${info.link}`);
+                            toast.success(i18n.t('navigation_copy.invite_copied', { link: info.link }));
                         } catch (e) {
-                            toast.error(`Failed to copy to clipboard: ${e}`);
+                            toast.error(i18n.t('navigation_copy.clipboard_error', { error: String(e) }));
                         }
                     } catch { /* backend error already toasted in hook */ }
                 }}
@@ -847,7 +892,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                 onSmartViewChange={setActiveSmartView}
             />
 
-            <main className="flex min-w-0 flex-1 flex-col">
+            <section aria-label={currentViewName} className="flex min-w-0 flex-1 flex-col">
                 <div className="desktop-chrome-row justify-end"><button type="button" onClick={() => setWorkspaceKeys([])} className="quiet-control flex h-8 items-center gap-2 px-3 text-ui font-medium text-app-accent hover:bg-app-hover"><Files className="h-4 w-4" />{t('workspace.title')}</button></div>
                 <TopBar
                     currentFolderName={currentViewName}
@@ -883,12 +928,15 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                         </h2>
                     </div>
                 )}
+                {insightSummary?.scope === fileLoadScope && !insightSummary.complete && <p role="status" className="px-3 text-xs text-app-text-secondary">{t('workspace.search_partial', { count: insightSummary.count })}</p>}
+                {searchError && <p role="alert" className="px-3 text-xs text-app-danger">{t('workspace.error_operation')}</p>}
+                {searchReply && <p role="status" className="px-3 text-xs text-app-text-secondary">{t(searchReply.complete ? 'workspace.search_complete' : 'workspace.search_partial', { count: searchReply.total })}{searchReply.offline ? ` · ${t('settings.offline')}` : ''}</p>}
                 <FileExplorer
                     key={accountId ?? 'signed-out'}
                     folders={folders}
                     files={displayedFiles}
                     loading={(isLoading && allFiles.length === 0) || isSearching}
-                    error={error}
+                    error={searchError ? new Error(t('workspace.error_operation')) : error}
                     viewMode={viewMode}
                     selectedIds={selectedIds}
                     activeFolderId={activeFolderId}
@@ -912,7 +960,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                     syncProgress={folderSyncProgress}
                     selectionDisabled={isCrossFolderView}
                 />
-            </main>
+            </section>
 
             {workspaceKeys !== null && <LazyFeatureBoundary><LazyWorkspaceHub folders={folders} initialKeys={workspaceKeys} onClose={() => setWorkspaceKeys(null)} onOpen={(file, orderedFiles, localPath) => handlePreview(file, orderedFiles, localPath)} onFolder={id => { setWorkspaceKeys(null); setActiveSmartView(null); setActiveFolderId(id); }} /></LazyFeatureBoundary>}
 
@@ -1053,7 +1101,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                         <div className="p-4 border-b border-telegram-border flex items-center justify-between">
                             <h3 className="text-telegram-text font-medium flex items-center gap-2">
                                 <Link className="w-5 h-5 text-telegram-primary" />
-                                {bulkShareLinks.length} {i18n.t("files.share_link")}{bulkShareLinks.length !== 1 ? 's' : ''}
+                                {i18n.t('common.action_count', { action: i18n.t('files.share_link'), count: bulkShareLinks.length })}
                             </h3>
                             <button onClick={() => setBulkShareLinks(null)} className="text-telegram-subtext hover:text-telegram-text">
                                 <X className="w-5 h-5" />
@@ -1063,7 +1111,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                         {bulkShareLoading ? (
                             <div className="flex flex-col items-center justify-center py-16 space-y-3">
                                 <Loader2 className="w-8 h-8 text-telegram-primary animate-spin" />
-                                <p className="text-sm text-telegram-subtext">Generating share links...</p>
+                                <p className="text-sm text-telegram-subtext">{i18n.t('navigation_copy.generating_links')}</p>
                             </div>
                         ) : (
                             <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
@@ -1111,7 +1159,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                             onClick={() => setBulkShareLinks(null)}
                             className="w-full px-4 py-2.5 border-t border-telegram-border bg-telegram-hover/20 hover:bg-telegram-hover/40 text-telegram-text text-sm font-medium transition-colors"
                         >
-                            Done
+                            {i18n.t("settings.done")}
                         </button>
                     </div>
                 </div>

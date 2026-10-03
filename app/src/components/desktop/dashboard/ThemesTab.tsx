@@ -1,3 +1,4 @@
+import i18n from '../../../i18n';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Monitor, Moon, Palette, Plus, RotateCcw, Sparkles, Sun, Trash2 } from 'lucide-react';
@@ -220,7 +221,7 @@ export function ThemesTab() {
                     </h3>
 
                     <div className="flex items-center gap-2">
-                        <label className="text-xs text-telegram-subtext w-16 shrink-0">{t('settings.theme_name')}</label>
+                        <label className="text-xs text-telegram-subtext w-16 shrink-0">{t('common.name')}</label>
                         <input
                             type="text"
                             value={editingTheme.name}
@@ -241,7 +242,7 @@ export function ThemesTab() {
                                         : 'bg-telegram-hover text-telegram-subtext hover:text-telegram-text'
                                 }`}
                             >
-                                Dark
+                                {i18n.t('ui_copy.dark')}
                             </button>
                             <button
                                 onClick={() => handleBaseToggle(false)}
@@ -251,7 +252,7 @@ export function ThemesTab() {
                                         : 'bg-telegram-hover text-telegram-subtext hover:text-telegram-text'
                                 }`}
                             >
-                                Light
+                                {i18n.t('ui_copy.light')}
                             </button>
                         </div>
                     </div>

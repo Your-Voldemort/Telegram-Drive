@@ -16,16 +16,16 @@ import {
 
 import { useTranslation } from "react-i18next";
 import i18n from '../../i18n';
-import '../../i18n/supporterTranslations';
 
 function AuthThemeToggle() {
+    useTranslation();
     const { theme, toggleTheme } = useTheme();
     return (
         <button
             onClick={toggleTheme}
             className="quiet-control absolute end-4 top-[calc(1rem+env(safe-area-inset-top,24px))] z-10 flex h-9 w-9 items-center justify-center border border-app-border bg-app-surface-raised text-app-text-secondary shadow-[var(--shadow-raised)] hover:text-app-text"
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            title={theme === 'dark' ? i18n.t("common.switch_light") : i18n.t("common.switch_dark")}
+            aria-label={theme === 'dark' ? i18n.t("common.switch_light") : i18n.t("common.switch_dark")}
         >
             {theme === 'dark' ? (
                 <Sun className="h-4 w-4" />
@@ -410,7 +410,7 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
             >
                 <div className="mb-6 text-center">
                     <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center">
-                        <img src="/logo.svg" alt="Logo" className="w-full h-full" />
+                        <img src="/logo.svg" alt={i18n.t('common.app_title')} className="w-full h-full" />
                     </div>
                     <h1 className="text-app-title font-semibold tracking-[-0.01em] text-app-text">{i18n.t("common.app_title")}</h1>
                     <p className="mt-1 text-metadata text-app-text-secondary">{i18n.t("auth.tagline")}</p>
@@ -493,7 +493,12 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
                                     loading={loading}
                                     onPasswordChange={setPassword}
                                     onSubmit={handlePasswordSubmit}
-                                    onBack={() => { setStep("code"); setPassword(""); setError(null); }}
+                                    onBack={() => {
+                                        // The login code was consumed when Telegram asked for the
+                                        // password, so going back restarts from the sign-in method.
+                                        setPassword("");
+                                        void handleChangePhone();
+                                    }}
                                 />
                             )}
                         </>
@@ -635,11 +640,11 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
 
                                 <div className="space-y-4">
                                     <a href="#" onClick={(e) => { e.preventDefault(); open('https://link.trustwallet.com/send?address=ltc1q6wkr5ac4u0pxx4hx7xgwn0gsaku25ws0df73rp&asset=c2'); }} className="block hover:opacity-80 transition-opacity">
-                                        <img src="https://img.shields.io/badge/Donate-LTC-345D9D?style=for-the-badge&logo=litecoin&logoColor=white" alt={t('supporter_license.donate_ltc')} className="mx-auto h-[28px]" />
+                                        <img src="/donation/ltc.svg" alt={t('supporter_license.donate_ltc')} className="mx-auto h-[28px]" />
                                     </a>
 
                                     <a href="#" onClick={(e) => { e.preventDefault(); open('https://link.trustwallet.com/send?asset=c0&address=bc1q5pt7m2fk6w0dzsnf6vvd5k6nw5k44785286ujy'); }} className="block hover:opacity-80 transition-opacity">
-                                        <img src="https://img.shields.io/badge/Donate-BTC-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white" alt={t('supporter_license.donate_btc')} className="mx-auto h-[28px]" />
+                                        <img src="/donation/btc.svg" alt={t('supporter_license.donate_btc')} className="mx-auto h-[28px]" />
                                     </a>
                                     <p className="text-metadata leading-5 text-app-text-tertiary">{t('supporter_license.auth_crypto_note')}</p>
                                 </div>

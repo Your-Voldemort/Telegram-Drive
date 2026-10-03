@@ -39,6 +39,7 @@ import { version as appVersion } from "../package.json";
 import { consumeWhatsNew, type WhatsNewDetails } from "./services/updateReliability";
 import { useTvSpatialNavigation } from "./hooks/useTvSpatialNavigation";
 import { ensureLanguageResource } from "./i18n";
+import { publishNativeLanguage } from "./services/nativeLanguage";
 import { useSupporter } from "./context/SupporterContext";
 import { shouldShowSponsorContent } from "./services/supporterVisibility";
 
@@ -46,17 +47,17 @@ type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "sponsor-che
 
 const AD_GATEWAY_PASSED_KEY = "ad_gateway_passed";
 
+let languageApplyQueue: Promise<void> = Promise.resolve();
+
 interface StartupProgress {
-  label: string;
-  detail: string;
+  stage: "initial" | "local" | "session" | "empty" | "invalid" | "connect" | "account" | "sponsor";
   percent: number;
 }
 
 function AppContent() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [startupProgress, setStartupProgress] = useState<StartupProgress>({
-    label: "Starting Telegram Drive",
-    detail: "Preparing local services…",
+    stage: "initial",
     percent: 8,
   });
   const [whatsNew, setWhatsNew] = useState<WhatsNewDetails | null>(() => consumeWhatsNew(appVersion));
@@ -78,12 +79,21 @@ function AppContent() {
     if (!isLoaded) return;
     const activeLang = resolveLanguagePreference(settings.language);
     const info = getLanguageInfo(activeLang);
-    document.documentElement.lang = activeLang;
-    document.documentElement.dir = info.dir;
     let cancelled = false;
     void ensureLanguageResource(activeLang)
       .then(() => {
-        if (!cancelled) void i18n.changeLanguage(activeLang);
+        const operation = languageApplyQueue.then(async () => {
+          if (cancelled) return;
+          await i18n.changeLanguage(activeLang);
+          if (cancelled) return;
+          document.documentElement.lang = activeLang;
+          document.documentElement.dir = info.dir;
+          await publishNativeLanguage(activeLang);
+        });
+        // Serialize IPC as well as language application, including across remounts.
+        // An older dispatched language completes before the next valid language.
+        languageApplyQueue = operation.catch(() => undefined);
+        return operation;
       })
       .catch(() => {
         if (import.meta.env.DEV) console.error(`[i18n] Unable to load ${activeLang}`);
@@ -127,9 +137,9 @@ function AppContent() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        setStartupProgress({ label: "Checking local services", detail: "Verifying the database and streaming runtime…", percent: 18 });
+        setStartupProgress({ stage: "local", percent: 18 });
         await invoke("cmd_get_startup_health");
-        setStartupProgress({ label: "Restoring your session", detail: "Reading the saved Telegram account…", percent: 38 });
+        setStartupProgress({ stage: "session", percent: 38 });
         const store = await load("config.json");
         const savedId = await store.get<string>("api_id");
         const legacyApiHash = await store.get<string>("api_hash");
@@ -145,27 +155,27 @@ function AppContent() {
         }
 
         if (!savedId) {
-          setStartupProgress({ label: "Ready to sign in", detail: "No saved session was found.", percent: 100 });
+          setStartupProgress({ stage: "empty", percent: 100 });
           setAuthStatus("unauthenticated");
           return;
         }
 
         const apiId = parseInt(savedId, 10);
         if (isNaN(apiId)) {
-          setStartupProgress({ label: "Ready to sign in", detail: "The saved session needs attention.", percent: 100 });
+          setStartupProgress({ stage: "invalid", percent: 100 });
           setAuthStatus("unauthenticated");
           return;
         }
 
         // Initialize the client with the saved API ID
-        setStartupProgress({ label: "Starting Telegram", detail: "Initializing the secure desktop client…", percent: 58 });
+        setStartupProgress({ stage: "connect", percent: 58 });
         await invoke("cmd_connect", { apiId });
 
         // Verify the session is still valid with Telegram servers
-        setStartupProgress({ label: "Checking your account", detail: "Confirming the session with Telegram…", percent: 82 });
+        setStartupProgress({ stage: "account", percent: 82 });
         const ok = await invoke<boolean>("cmd_check_connection");
         if (ok) {
-          setStartupProgress({ label: "Checking sponsor access", detail: "Finishing your local access checks…", percent: 96 });
+          setStartupProgress({ stage: "sponsor", percent: 96 });
           setAuthStatus("sponsor-check");
         } else {
           setAuthStatus("unauthenticated");
@@ -244,18 +254,18 @@ function AppContent() {
 
   // Warm-up screen driven by actual Rust health and Telegram session steps.
   if (authStatus === "loading" || authStatus === "sponsor-check") {
-    const visibleProgress = authStatus === "sponsor-check"
-      ? { label: "Checking sponsor access", detail: "Finishing your local access checks…", percent: 96 }
+    const visibleProgress: StartupProgress = authStatus === "sponsor-check"
+      ? { stage: "sponsor", percent: 96 }
       : startupProgress;
     return (
       <main className="h-screen w-screen flex items-center justify-center bg-telegram-bg">
         <div className="flex w-full max-w-sm flex-col items-center gap-5 px-8" role="status" aria-live="polite">
           <img src="/logo.svg" className="w-16 h-16 drop-shadow-lg animate-pulse" alt={i18n.t("common.app_title")} />
           <div className="w-full text-center">
-            <p className="text-sm font-semibold text-telegram-text">{visibleProgress.label}</p>
-            <p className="mt-1 text-xs text-telegram-subtext">{visibleProgress.detail}</p>
+            <p className="text-sm font-semibold text-telegram-text">{t(`runtime.startup_${visibleProgress.stage}_label`)}</p>
+            <p className="mt-1 text-xs text-telegram-subtext">{t(`runtime.startup_${visibleProgress.stage}_detail`)}</p>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10" aria-label={`${visibleProgress.percent}% complete`}>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10" aria-label={t('runtime.startup_percent',{percent:visibleProgress.percent})}>
             <div className="h-full rounded-full bg-telegram-primary transition-[width] duration-300" style={{ width: `${visibleProgress.percent}%` }} />
           </div>
         </div>

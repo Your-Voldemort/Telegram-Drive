@@ -34,7 +34,7 @@ Telegram Drive turns Telegram's familiar file storage into a focused, desktop-st
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Folder Sync](#folder-sync-desktop)
-- [Encryption](#optional-client-side-encryption-alpha)
+- [Encryption](#optional-client-side-encryption-beta-format-frozen)
 - [Privacy and security](#privacy-and-security)
 - [Android and Google TV](#android-and-google-tv-signed-preview)
 - [Documentation](#documentation)
@@ -55,14 +55,14 @@ Telegram Drive turns Telegram's familiar file storage into a focused, desktop-st
 
 ## Download and install
 
-Desktop **3.9.0** and Android / Android TV **4.1.0 preview** are available below.
+Desktop **3.9.8** and Android / Android TV **4.1.0 preview** are available below.
 
 | Platform | Download | Notes |
 | --- | --- | --- |
-| **Windows x64** | [Installer](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.0/Telegram.Drive_3.9.0_x64-setup.exe) | Includes the required Microsoft Visual C++ runtime setup |
-| **macOS — Apple Silicon** | [DMG](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.0/Telegram.Drive_3.9.0_aarch64.dmg) | For M-series Macs |
-| **macOS — Intel** | [DMG](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.0/Telegram.Drive_3.9.0_x64.dmg) | For Intel-based Macs |
-| **Linux x64** | [AppImage](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.0/Telegram.Drive_3.9.0_amd64.AppImage) · [Debian](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.0/Telegram.Drive_3.9.0_amd64.deb) · [RPM](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.0/Telegram.Drive-3.9.0-1.x86_64.rpm) · [Arch](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.0/telegram-drive-bin-3.9.0-1-x86_64.pkg.tar.zst) | Choose your distribution; Arch updates remain managed by pacman |
+| **Windows x64** | [Installer](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.8/Telegram.Drive_3.9.8_x64-setup.exe) | Includes the required Microsoft Visual C++ runtime setup |
+| **macOS — Apple Silicon** | [DMG](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.8/Telegram.Drive_3.9.8_aarch64.dmg) | For M-series Macs |
+| **macOS — Intel** | [DMG](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.8/Telegram.Drive_3.9.8_x64.dmg) | For Intel-based Macs |
+| **Linux x64** | [AppImage](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.8/Telegram.Drive_3.9.8_amd64.AppImage) · [Debian](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.8/Telegram.Drive_3.9.8_amd64.deb) · [RPM](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.8/Telegram.Drive-3.9.8-1.x86_64.rpm) · [Arch](https://github.com/caamer20/Telegram-Drive/releases/download/v3.9.8/telegram-drive-bin-3.9.8-1-x86_64.pkg.tar.zst) | Choose your distribution; Arch updates remain managed by pacman |
 | **Android phones and tablets** | [Signed universal APK](https://github.com/caamer20/Telegram-Drive/releases/download/Androidv4.1.0beta/Telegram-Drive-v4.1.0-android-universal.apk) | Android 7.0 or newer; supports ARM64, ARMv7, x86, and x86_64 |
 | **Android TV / Google TV** | [Signed TV-compatible APK](https://github.com/caamer20/Telegram-Drive/releases/download/Androidv4.1.0beta/Telegram-Drive-v4.1.0-android-universal.apk) | The same universal package includes the TV launcher and remote navigation |
 
@@ -188,7 +188,9 @@ Safety behavior includes:
 
 Folder Sync is disabled until enabled in **Settings → Folder Sync**. Read the [Folder Sync guide](SYNC_GUIDE.md) before mapping an important directory, and keep a separate tested backup.
 
-## Optional client-side encryption (alpha)
+## Optional client-side encryption (beta, format frozen)
+
+See the [frozen format specification](Docs/TDENC2_FORMAT.md) and [recovery drill](Docs/ENCRYPTION_RECOVERY_DRILL.md).
 
 Telegram Drive includes opt-in encrypted transfers using the versioned **TDENC2** envelope. Standard uploads remain the default. Encryption can be selected as a default for future uploads or chosen for an individual upload.
 
@@ -204,7 +206,7 @@ The implementation provides streaming XChaCha20-Poly1305 encryption before uploa
 > [!CAUTION]
 > **Telegram Drive cannot recover, reset, or reconstruct a lost vault passphrase, file passphrase, encryption key, or unusable recovery bundle.** Protect and test your recovery material and keep an independent backup of important files. Lost credentials or damaged recovery material can make encrypted data permanently unrecoverable.
 
-The encryption design and implementation have **not received an independent security audit**. Use isolated test data first. This alpha feature is not a substitute for a tested backup strategy.
+The encryption design and implementation have **not received an independent security audit**. Use isolated test data first. This frozen-format beta is not a substitute for a tested backup strategy.
 
 ### Current encrypted-file limitations
 
@@ -321,6 +323,7 @@ Do not expose these ports to a LAN or the internet. See the [REST API endpoint r
 | [Supporter service operations](SUPPORTER_SERVICE.md) | Worker, PayPal, D1, secure configuration, and release checks |
 | [Supporter backup and recovery](SUPPORTER_BACKUP_RECOVERY.md) | D1 backup provisioning, restore drills, and production recovery |
 | [Android and Google TV release runbook](Docs/ANDROID_SIDELOAD_RELEASE.md) | Signing, packaging, acceptance, and sideload-release checks |
+| [Desktop code signing](Docs/CODE_SIGNING.md) | macOS notarization and Windows Authenticode settings, and first-signed-release acceptance |
 
 ## Build from source
 
@@ -366,17 +369,19 @@ On Windows, the build scripts download and validate Microsoft's signed Visual C+
 
 ### Validation
 
-Run the relevant checks from `app/` before submitting changes:
+Behavioral tests are end-to-end journeys; there are no unit suites. Run the relevant checks from `app/` before submitting changes:
 
 ```bash
-npm run build
+npm run build:verify
 npm test
 npm run i18n:check
 cd src-tauri
 cargo fmt --all -- --check
-cargo clippy --lib --all-targets -- -D warnings
-cargo test --lib
+cargo clippy --locked --features native-e2e --lib --all-targets -- -D warnings
+cargo test --locked --features native-e2e --test native_e2e
 ```
+
+`node scripts/run-e2e.cjs` from the repository root runs every host suite. See [TESTING.md](TESTING.md) for what each suite covers and what still needs installed-app or device acceptance.
 
 The application is built with Tauri 2, Rust, React 19, TypeScript, Tailwind CSS 4, TanStack Query/Virtual, SQLite, Tokio, Actix Web, Grammers, PDF.js, HLS.js, and MP4Box.
 
@@ -412,3 +417,7 @@ Direct cryptocurrency tips help support development but **do not** activate the 
 Telegram Drive is not affiliated with Telegram FZ-LLC. Use the application responsibly and in accordance with Telegram's terms and applicable law.
 
 </div>
+
+### TV field navigation
+
+With TV directional navigation, arrows edit a focused native field. After finishing an edit (or closing a native select picker), press Escape to return that field to directional navigation; the next arrow moves focus to another control. Enter resumes editing. A second Escape while already in navigation mode keeps the normal dialog-close behavior. Browser Escape is verified; physical Google TV Back event delivery and remote acceptance remain unrun.

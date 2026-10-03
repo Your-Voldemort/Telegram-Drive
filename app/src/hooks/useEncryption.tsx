@@ -11,6 +11,8 @@ import type {
     VaultStatus,
     FileEncryptionInfo,
     CryptoInventory,
+    RecoveryImportOptions,
+    RecoveryVerification,
 } from '../types';
 
 interface EncryptionContextType {
@@ -27,11 +29,13 @@ interface EncryptionContextType {
     unlockVault: (passphrase: string) => Promise<number>;
     lockVault: () => Promise<void>;
     createVault: (passphrase: string) => Promise<void>;
-    changeVaultPassphrase: (newPassphrase: string) => Promise<void>;
+    changeVaultPassphrase: (currentPassphrase: string, newPassphrase: string) => Promise<void>;
     getFileEncryptionInfo: (messageId: number, folderId: number | null) => Promise<FileEncryptionInfo>;
     generateRecoveryKey: () => Promise<string>;
     exportRecovery: (recoveryPassphrase: string) => Promise<string>;
-    importRecovery: (bundle: string, recoveryPassphrase: string) => Promise<void>;
+    /** Proves a bundle can restore the unlocked vault. Changes nothing. */
+    verifyRecovery: (bundle: string, recoveryPassphrase: string) => Promise<RecoveryVerification>;
+    importRecovery: (bundle: string, recoveryPassphrase: string, options?: RecoveryImportOptions) => Promise<void>;
 }
 
 const EncryptionContext = createContext<EncryptionContextType | undefined>(undefined);
@@ -185,8 +189,8 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         await refreshVaultStatus();
     }, [refreshVaultStatus]);
 
-    const changeVaultPassphrase = useCallback(async (newPassphrase: string) => {
-        await invoke('cmd_change_vault_passphrase', { newPassphrase });
+    const changeVaultPassphrase = useCallback(async (currentPassphrase: string, newPassphrase: string) => {
+        await invoke('cmd_change_vault_passphrase', { currentPassphrase, newPassphrase });
         await refreshVaultStatus();
     }, [refreshVaultStatus]);
 
@@ -210,14 +214,27 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    const verifyRecovery = useCallback(async (
+        bundle: string,
+        recoveryPassphrase: string,
+    ): Promise<RecoveryVerification> => {
+        return await invoke<RecoveryVerification>('cmd_verify_vault_recovery', {
+            bundleBase64: bundle,
+            recoveryPassphrase,
+        });
+    }, []);
+
     const importRecovery = useCallback(async (
         bundle: string,
         recoveryPassphrase: string,
+        options: RecoveryImportOptions = {},
     ): Promise<void> => {
         await invoke('cmd_import_vault_recovery', {
             bundleBase64: bundle,
             recoveryPassphrase,
+            vaultPassphrase: options.vaultPassphrase || null,
             replaceExisting: true,
+            allowKeyReplacement: options.allowKeyReplacement === true,
         });
         await refreshVaultStatus();
     }, [refreshVaultStatus]);
@@ -240,6 +257,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         getFileEncryptionInfo,
         generateRecoveryKey,
         exportRecovery,
+        verifyRecovery,
         importRecovery,
     };
 

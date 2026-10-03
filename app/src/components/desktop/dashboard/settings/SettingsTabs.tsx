@@ -1,3 +1,4 @@
+import {useTranslation} from 'react-i18next';
 import { lazy, useEffect, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Bug, Cloud, Database, Globe, HardDrive, Megaphone, Shield, Zap, Clipboard, Loader2, RefreshCw, Upload, Download } from 'lucide-react';
@@ -228,9 +229,10 @@ interface AdvancedSettingsTabProps {
 }
 
 export function AdvancedSettingsTab({ onOpenApi, onOpenWebDav, onOpenProxy, onOpenVpn }: AdvancedSettingsTabProps) {
+    useTranslation();
   return (
     <motion.section key="advanced" {...tabMotion} className="space-y-4">
-      <div><h3 className="text-base font-semibold text-app-text">Advanced</h3><p className="mt-1 text-sm text-app-text-secondary">Power-user connections are grouped here so everyday settings stay calm and focused. Use the settings search to find any option by name.</p></div>
+      <div><h3 className="text-base font-semibold text-app-text">{i18n.t("settings.tab_advanced")}</h3><p className="mt-1 text-sm text-app-text-secondary">Power-user connections are grouped here so everyday settings stay calm and focused. Use the settings search to find any option by name.</p></div>
       <div className="grid gap-3 sm:grid-cols-2">
         {([
           ['REST API', 'Local automation endpoint and API key', Globe, onOpenApi],
@@ -264,7 +266,7 @@ export function AboutSettingsTab({ appVersion, diagnosticsLoading, t, onCopyDiag
   return (
     <motion.section key="about" {...tabMotion} className="w-full space-y-4">
       <div className="flex flex-col items-center space-y-5 py-6">
-        <img src="/logo.svg" className="h-16 w-16 drop-shadow-lg" alt="Telegram Drive Logo" />
+        <img src="/logo.svg" className="h-16 w-16 drop-shadow-lg" alt={i18n.t('common.app_title')} />
         <div className="text-center"><h3 className="text-base font-bold text-telegram-text">{i18n.t("common.app_title")}</h3><p className="mt-0.5 text-xs text-telegram-subtext">v{appVersion}</p></div>
         <div className="h-px w-12 bg-telegram-border" />
         <button onClick={onCopyDiagnostics} disabled={diagnosticsLoading} className="flex items-center gap-1.5 rounded-lg border border-telegram-border bg-telegram-hover px-3 py-1.5 text-xs font-medium text-telegram-subtext transition hover:bg-telegram-border/30 hover:text-telegram-text disabled:opacity-50">
@@ -279,7 +281,7 @@ export function AboutSettingsTab({ appVersion, diagnosticsLoading, t, onCopyDiag
             github.com/caamer20/telegram-drive
           </button>
         </div>
-        <p className="max-w-[280px] text-center text-[11px] leading-relaxed text-telegram-subtext/60">{t('settings.tagline')}</p>
+        <p className="max-w-[280px] text-center text-[11px] leading-relaxed text-telegram-subtext">{t('settings.tagline')}</p>
       </div>
     </motion.section>
   );
