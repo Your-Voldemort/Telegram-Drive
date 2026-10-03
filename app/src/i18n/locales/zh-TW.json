@@ -86,7 +86,14 @@
     "language_load_failed": "無法載入本機語言檔案。請重新載入應用程式後重試。",
     "action_name": "{{name}} — {{action}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "退出"
+    "sign_out": "退出",
+    "browser_picker": "瀏覽器選擇器",
+    "system": "系統",
+    "download_destination": "選擇下載目標",
+    "download_folder_to": "將資料夾下載至…",
+    "upload_folder_picker": "選擇要上傳的資料夾",
+    "show_in_folder": "在資料夾中顯示",
+    "webdav_settings": "WebDAV 設定"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -569,7 +576,8 @@
     "close_ad": "關閉廣告",
     "closes_in": "{{seconds}} 秒後關閉",
     "auto_close_label": "贊助廣告 — {{seconds}} 秒後自動關閉",
-    "view_offer": "查看優惠"
+    "view_offer": "查看優惠",
+    "thanks": "感謝您的支持！"
   },
   "supporter_offer": {
     "eyebrow": "支持 Telegram Drive",
@@ -1166,7 +1174,8 @@
     "donate_btc": "捐贈 BTC",
     "nav_title": "終身授權",
     "purchased_title": "已購買終身授權",
-    "manage_license": "授權詳情與復原"
+    "manage_license": "授權詳情與復原",
+    "recovery_example": "範例：XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "有新版本 ({{version}}) 可用！",
@@ -1237,7 +1246,14 @@
     "loading_preview": "正在載入預覽…",
     "preview_error": "預覽錯誤",
     "preview_unsupported": "應用程式內不支援預覽。",
-    "file_type": "檔案類型："
+    "file_type": "檔案類型：",
+    "stream_failed": "初始化串流失敗",
+    "pdf_document_failed": "載入 PDF 文件失敗。",
+    "pdf_native_failed": "無法在 WebView 中顯示 PDF 或用原生應用程式開啟：{{error}}",
+    "pdf_path_failed": "取得 PDF 預覽路徑失敗。",
+    "pdf_load_failed": "載入 PDF 失敗。",
+    "image_render_failed": "顯示圖片預覽失敗",
+    "unmute": "取消靜音"
   },
   "operations": {
     "delete_file": "刪除檔案",
@@ -1440,5 +1456,135 @@
     "plain_description": "正常上傳，取得最佳相容性和方便的分享。",
     "protect": "儲存並保護",
     "protect_description": "上傳前使用已設定的保護選項進行加密。"
+  },
+  "auth_copy": {
+    "qr_title": "優先使用 QR 安全登入",
+    "qr_description": "桌面登入使用 Telegram 的 QR 裝置流程。Telegram 仍要求一次性輸入 API ID 和雜湊，以識別此開放原始碼用戶端。",
+    "advanced": "進階用戶端憑證",
+    "continue_phone": "繼續使用電話登入",
+    "continue_qr": "繼續使用 QR 登入",
+    "qr_path": "設定 > 裝置 > 連結桌面裝置",
+    "help_intro": "Telegram Drive 使用您的 Telegram 帳戶作為本機優先檔案工作區的儲存後端。開始使用需要 Telegram 帳戶和 API 憑證。",
+    "portal_heading": "前往 Telegram 開發者入口",
+    "portal_instruction": "造訪 <portal>my.telegram.org</portal>，使用電話號碼登入。",
+    "create_heading": "建立新應用程式",
+    "create_instruction": "點選 \"API development tools\" 並建立新應用程式。名稱和說明可自行選擇。",
+    "copy_heading": "複製您的憑證",
+    "copy_instruction": "建立應用程式後，您會看到 {{apiId}}（數字）和 {{apiHash}}（字串）。複製兩者並貼到上一畫面的欄位。",
+    "hash_example": "範例：abcdef123456…",
+    "open_portal": "開啟 my.telegram.org",
+    "privacy": "🔒 隱私：",
+    "connecting": "正在連線…",
+    "unlock": "解鎖",
+    "id_number": "API ID 必須為數字",
+    "no_spaces": "API ID 和 API Hash 不能包含空格。請移除空格。",
+    "credentials_required": "API ID 和 Hash 都必須填寫。"
+  },
+  "protection_labels": {
+    "decrypted": "已解密",
+    "encrypted": "已加密",
+    "key_missing": "缺少金鑰",
+    "newer_version": "需要更新的應用程式版本",
+    "corrupt": "已損毀",
+    "verifying": "正在驗證",
+    "learn": "{{state}} — 了解此檔案為何受保護",
+    "explain": "{{state}}。說明檔案保護機制",
+    "contract_error": "不支援的加密命令協定 {{version}}",
+    "settings_rejected": "加密設定遭拒：{{error}}",
+    "auth_export": "匯出保險庫復原資料前進行身分驗證",
+    "auth_check": "檢查保險庫復原資料前進行身分驗證",
+    "auth_import": "匯入保險庫復原資料前進行身分驗證",
+    "auth_change": "變更保險庫通行片語前進行身分驗證",
+    "provide_credentials": "提供加密憑證"
+  },
+  "drive_intro": {
+    "drive_title": "您的 Telegram 帳戶成為磁碟",
+    "drive_body": "已儲存的訊息是您的主要儲存空間。Telegram Drive 透過您的 Telegram 工作階段直接讀寫檔案。",
+    "folders_title": "資料夾是私人頻道",
+    "folders_body": "建立資料夾會建立您帳戶擁有的私人 Telegram 頻道。應用程式將這些頻道呈現為熟悉的磁碟。",
+    "protection_title": "正常儲存或先保護",
+    "protection_body": "每次上傳都可正常儲存，或在到達 Telegram 前進行本機保護。分享和 WebDAV 一律需要明確選擇啟用。",
+    "progress": "開始使用 · {{current}} / {{total}}",
+    "skip": "略過磁碟介紹",
+    "progress_label": "介紹進度",
+    "help": "開啟說明與常見問題"
+  },
+  "help_topics": {
+    "storage_question": "我的檔案儲存在哪裡？",
+    "storage_answer": "檔案是已儲存的訊息或作為資料夾建立的私人頻道中的 Telegram 訊息。Telegram Drive 不營運獨立的雲端儲存帳戶。",
+    "limits_question": "實際限制有哪些？",
+    "limits_answer": "此應用程式中單一 Telegram 物件上限為 2 GB。大型資料夾可能需要較長索引時間；即時訊息計數顯示同步進度。",
+    "protection_question": "儲存並保護有何作用？",
+    "protection_answer": "上傳前在本機加密檔案位元組。請妥善保管保險庫通行片語和復原套件：Telegram 無法替您復原受保護的檔案。",
+    "sharing_question": "分享如何運作？",
+    "sharing_answer": "選擇 Telegram 頻道連結、本機密碼保護連結或 WebDAV/REST。本機伺服器和存取 URL 必須明確啟用。",
+    "guest_question": "為何 Finder 訪客顯示空資料夾？",
+    "guest_answer": "WebDAV 存取權由完整 /dav/<token>/ URL 中的權杖授予。訪客或匿名登入沒有權杖範圍內的存取權。",
+    "more": "需要更多協助？",
+    "support": "開啟支援問題"
+  },
+  "shortcut_labels": {
+    "search": "搜尋檔案",
+    "select_all": "選取所有檔案",
+    "open": "開啟所選檔案",
+    "rename": "重新命名所選檔案",
+    "download": "下載所選內容",
+    "share": "分享所選內容",
+    "delete": "刪除所選內容",
+    "close": "關閉目前對話框或清除選取",
+    "show": "顯示此快速鍵指南"
+  },
+  "privacy_destinations": {
+    "device_title": "此裝置",
+    "device_body": "設定、佇列狀態、縮圖和加密保險庫資料保留在本機。",
+    "telegram_body": "資料夾頻道和上傳檔案訊息直接傳送到您的 Telegram 帳戶。",
+    "sponsors_title": "贊助商",
+    "sponsors_body": "贊助內容僅在標示的廣告區域載入。檔案活動絕不會傳送給贊助商。",
+    "crash_title": "當機報告",
+    "crash_body": "僅在同意後：應用程式版本、平台、錯誤類型和清理過的函式名稱。"
+  },
+  "theme_names": {
+    "default_dark": "預設深色",
+    "charcoal": "木炭",
+    "cyber_teal": "賽博青綠",
+    "default_light": "預設淺色",
+    "ocean": "海洋",
+    "forest": "森林",
+    "plum": "紫梅",
+    "paper": "紙張",
+    "rose": "玫瑰",
+    "mint": "薄荷",
+    "sky": "天空"
+  },
+  "advanced_copy": {
+    "rest_description": "本機自動化端點和 API 金鑰",
+    "webdav_description": "Finder 和檔案管理員存取",
+    "proxy_description": "SOCKS5 和 HTTP 橋接設定",
+    "vpn_title": "VPN 與網路",
+    "vpn_description": "重試、頻寬和資料中心調校"
+  },
+  "settings_sync_copy": {
+    "replace_title": "取代設定備份？",
+    "replace_description": "最新加密備份來自另一台裝置。上傳會將其取代為此裝置目前的安全偏好設定。",
+    "replace": "取代備份",
+    "uploaded": "加密設定已上傳至 Telegram 已儲存的訊息。",
+    "apply_title": "套用 Telegram 中的設定？",
+    "apply_description": "同步的顯示、傳輸、網路調校和加密偏好將取代本機值。憑證和啟用資料不會變更。",
+    "apply": "套用設定",
+    "downloaded": "加密設定已下載並套用。",
+    "title": "加密設定同步",
+    "description": "透過您自己的 Telegram 已儲存的訊息手動在裝置間移動安全的應用程式偏好。Telegram Drive 不營運同步伺服器。",
+    "enable": "啟用加密設定同步",
+    "warning": "您的通行片語無法復原。",
+    "exclusions": "僅在本機使用，絕不儲存或上傳。加密的 Telegram 訊息可能在已儲存的訊息中可見。密碼、API/WebDAV 金鑰、代理資訊、supporter 啟用、當機報告同意狀態和檔案資料一律排除。",
+    "passphrase": "同步通行片語",
+    "placeholder": "至少 12 個字元",
+    "upload": "從此裝置上傳",
+    "download": "下載並套用",
+    "refresh": "重新整理設定同步狀態",
+    "latest": "最新備份：{{date}} · {{device}}",
+    "this_device": "由此裝置上傳",
+    "other_device": "由另一台裝置上傳",
+    "none": "最近 1,000 則已儲存的訊息中未找到加密設定備份。"
   }
 }

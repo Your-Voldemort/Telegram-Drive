@@ -545,7 +545,7 @@ export function PreviewModal({
                                 }}
                                 onError={() => {
                                     if (!localPath) forgetPreview(file.id, activeFolderId);
-                                    setError('Failed to render image preview');
+                                    setError(i18n.t('viewer.image_render_failed'));
                                     setLoading(false);
                                 }}
                             />

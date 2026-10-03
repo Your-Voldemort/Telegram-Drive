@@ -112,6 +112,8 @@ export async function desktopFixture(page: Page, options: {
           if (command === 'plugin:store|set') { store[args.key] = args.value; return; }
           if (command === 'plugin:store|delete') { delete store[args.key]; return true; }
           if (command === 'plugin:store|save') { if (state.saveFails) throw new Error('Storage unavailable'); persist(); return; }
+          if (command === 'cmd_get_settings_sync_status') return {available:true,updated_at:1_790_000_000,device_id:'other-fixture-device',current_device:false};
+          if (command === 'cmd_upload_settings_sync') return {available:true,updated_at:1_790_000_001,device_id:'this-fixture-device',current_device:true};
           if (command === 'cmd_get_startup_health') {if(state.holdStartupHealth)await startupHealthGate;return { ready: true, sponsor_port: state.sponsorPort, streaming_port: options.streamingPort ?? 14201, streaming_port_is_fallback: (options.streamingPort ?? 14201) !== 14201 };}
           if (command === 'cmd_auth_qr_login') return 'tg://login?token=browser-fixture-only';
           if (command === 'cmd_auth_qr_poll') return { success: false };

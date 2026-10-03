@@ -234,7 +234,7 @@ function AppContent() {
         if (shouldThank) {
           await store.delete("ad_click_thanks");
           await store.save();
-          toast.success("Thanks for your support! ", {
+          toast.success(t('ads.thanks'), {
             duration: 3000,
             style: {
               background: "rgba(255,255,255,0.08)",

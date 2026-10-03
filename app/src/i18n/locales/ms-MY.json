@@ -86,7 +86,14 @@
     "language_load_failed": "Fail bahasa tempatan tidak dapat dimuatkan. Muat semula aplikasi untuk mencuba lagi.",
     "action_name": "{{action}} {{name}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "Log Keluar"
+    "sign_out": "Log Keluar",
+    "browser_picker": "Pemilih pelayar",
+    "system": "Sistem",
+    "download_destination": "Pilih destinasi muat turun",
+    "download_folder_to": "Muat turun folder ke…",
+    "upload_folder_picker": "Pilih folder untuk dimuat naik",
+    "show_in_folder": "Tunjuk dalam folder",
+    "webdav_settings": "Tetapan WebDAV"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -569,7 +576,8 @@
     "close_ad": "Tutup iklan",
     "closes_in": "Ditutup dalam {{seconds}} saat",
     "auto_close_label": "Iklan tajaan — ditutup secara automatik dalam {{seconds}} saat",
-    "view_offer": "Lihat tawaran"
+    "view_offer": "Lihat tawaran",
+    "thanks": "Terima kasih atas sokongan anda!"
   },
   "supporter_offer": {
     "eyebrow": "Sokong Telegram Drive",
@@ -1166,7 +1174,8 @@
     "donate_btc": "Derma BTC",
     "nav_title": "Lesen Seumur Hidup",
     "purchased_title": "Lesen seumur hidup telah dibeli",
-    "manage_license": "Butiran dan pemulihan lesen"
+    "manage_license": "Butiran dan pemulihan lesen",
+    "recovery_example": "Contoh: XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "Versi baharu ({{version}}) tersedia!",
@@ -1237,7 +1246,14 @@
     "loading_preview": "Memuatkan pratonton…",
     "preview_error": "Ralat pratonton",
     "preview_unsupported": "Pratonton tidak disokong dalam aplikasi.",
-    "file_type": "Jenis fail:"
+    "file_type": "Jenis fail:",
+    "stream_failed": "Gagal memulakan strim",
+    "pdf_document_failed": "Gagal memuatkan dokumen PDF.",
+    "pdf_native_failed": "Gagal memaparkan PDF dalam WebView atau membukanya secara natif: {{error}}",
+    "pdf_path_failed": "Gagal mendapatkan laluan pratonton PDF.",
+    "pdf_load_failed": "Gagal memuatkan PDF.",
+    "image_render_failed": "Gagal memaparkan pratonton imej",
+    "unmute": "Nyahsenyap"
   },
   "operations": {
     "delete_file": "Padam fail",
@@ -1440,5 +1456,135 @@
     "plain_description": "Muat naik seperti biasa untuk keserasian maksimum dan perkongsian mudah.",
     "protect": "Simpan dan lindungi",
     "protect_description": "Sulitkan sebelum muat naik menggunakan tetapan perlindungan anda."
+  },
+  "auth_copy": {
+    "qr_title": "Log masuk selamat dengan QR",
+    "qr_description": "Log masuk desktop menggunakan aliran peranti QR Telegram. Telegram masih memerlukan API ID dan hash yang dimasukkan sekali untuk mengenal pasti klien sumber terbuka ini.",
+    "advanced": "Kelayakan klien lanjutan",
+    "continue_phone": "Teruskan log masuk dengan telefon",
+    "continue_qr": "Teruskan log masuk dengan QR",
+    "qr_path": "Tetapan > Peranti > Pautkan peranti desktop",
+    "help_intro": "Telegram Drive menggunakan akaun Telegram anda sebagai storan ruang kerja fail yang mengutamakan penggunaan setempat. Anda memerlukan akaun Telegram dan kelayakan API untuk bermula.",
+    "portal_heading": "Pergi ke portal pembangun Telegram",
+    "portal_instruction": "Lawati <portal>my.telegram.org</portal> dan log masuk dengan nombor telefon anda.",
+    "create_heading": "Cipta aplikasi baharu",
+    "create_instruction": "Klik \"API development tools\" dan cipta aplikasi baharu. Gunakan apa-apa nama dan penerangan yang anda mahu.",
+    "copy_heading": "Salin kelayakan anda",
+    "copy_instruction": "Selepas mencipta aplikasi, anda akan melihat {{apiId}} (nombor) dan {{apiHash}} (rentetan). Salin kedua-duanya ke medan pada skrin sebelumnya.",
+    "hash_example": "Contoh: abcdef123456…",
+    "open_portal": "Buka my.telegram.org",
+    "privacy": "🔒 Privasi:",
+    "connecting": "Sedang menyambung…",
+    "unlock": "Buka kunci",
+    "id_number": "API ID mesti nombor",
+    "no_spaces": "API ID dan API Hash tidak boleh mengandungi ruang. Buang semua ruang.",
+    "credentials_required": "API ID dan Hash kedua-duanya diperlukan."
+  },
+  "protection_labels": {
+    "decrypted": "Dinyahsulit",
+    "encrypted": "Disulitkan",
+    "key_missing": "Kunci tiada",
+    "newer_version": "Memerlukan versi aplikasi lebih baharu",
+    "corrupt": "Rosak",
+    "verifying": "Sedang mengesahkan",
+    "learn": "{{state}} — ketahui sebab fail ini dilindungi",
+    "explain": "{{state}}. Terangkan perlindungan fail",
+    "contract_error": "Kontrak arahan penyulitan tidak disokong: {{version}}",
+    "settings_rejected": "Tetapan penyulitan ditolak: {{error}}",
+    "auth_export": "Sahkan identiti sebelum mengeksport bahan pemulihan peti besi",
+    "auth_check": "Sahkan identiti sebelum menyemak bahan pemulihan peti besi",
+    "auth_import": "Sahkan identiti sebelum mengimport bahan pemulihan peti besi",
+    "auth_change": "Sahkan identiti sebelum menukar frasa laluan peti besi",
+    "provide_credentials": "Berikan kelayakan penyulitan"
+  },
+  "drive_intro": {
+    "drive_title": "Akaun Telegram anda menjadi pemacu",
+    "drive_body": "Mesej Tersimpan ialah storan utama anda. Telegram Drive membaca dan menulis fail terus melalui sesi Telegram anda.",
+    "folders_title": "Folder ialah saluran peribadi",
+    "folders_body": "Mencipta folder mencipta saluran Telegram peribadi milik akaun anda. Aplikasi memaparkan saluran ini sebagai pemacu yang biasa digunakan.",
+    "protection_title": "Simpan biasa atau lindungi dahulu",
+    "protection_body": "Setiap muat naik boleh disimpan biasa atau dilindungi setempat sebelum sampai ke Telegram. Perkongsian dan WebDAV kekal sebagai tindakan pilihan yang perlu diaktifkan dengan jelas.",
+    "progress": "Bermula · {{current}} daripada {{total}}",
+    "skip": "Langkau pengenalan pemacu",
+    "progress_label": "Kemajuan pengenalan",
+    "help": "Buka bantuan dan soalan lazim"
+  },
+  "help_topics": {
+    "storage_question": "Di manakah fail saya disimpan?",
+    "storage_answer": "Fail ialah mesej Telegram dalam Mesej Tersimpan atau saluran peribadi yang dicipta sebagai folder. Telegram Drive tidak mengendalikan akaun storan awan berasingan.",
+    "limits_question": "Apakah had praktikalnya?",
+    "limits_answer": "Satu objek Telegram terhad kepada 2 GB dalam aplikasi ini. Folder sangat besar mungkin mengambil masa untuk diindeks; jumlah mesej langsung menunjukkan kemajuan penyegerakan.",
+    "protection_question": "Apakah fungsi Simpan dan lindungi?",
+    "protection_answer": "Menyulitkan bait fail setempat sebelum muat naik. Simpan frasa laluan peti besi dan berkas pemulihan dengan selamat: Telegram tidak boleh memulihkan fail dilindungi untuk anda.",
+    "sharing_question": "Bagaimanakah perkongsian berfungsi?",
+    "sharing_answer": "Pilih pautan saluran Telegram, pautan setempat berpassword atau WebDAV/REST. Pelayan setempat dan URL akses mesti diaktifkan dengan jelas.",
+    "guest_question": "Mengapa Tetamu dalam Finder memaparkan folder kosong?",
+    "guest_answer": "Akses WebDAV diberi melalui token dalam URL penuh /dav/<token>/. Log masuk tetamu atau tanpa nama tiada akses berskop token.",
+    "more": "Perlukan bantuan lagi?",
+    "support": "Buka isu sokongan"
+  },
+  "shortcut_labels": {
+    "search": "Cari fail",
+    "select_all": "Pilih semua fail",
+    "open": "Buka fail dipilih",
+    "rename": "Namakan semula fail dipilih",
+    "download": "Muat turun pilihan",
+    "share": "Kongsi pilihan",
+    "delete": "Padam pilihan",
+    "close": "Tutup dialog aktif atau kosongkan pilihan",
+    "show": "Paparkan rujukan pintasan ini"
+  },
+  "privacy_destinations": {
+    "device_title": "Peranti ini",
+    "device_body": "Tetapan, keadaan giliran, lakaran kecil dan bahan peti besi disulitkan kekal setempat.",
+    "telegram_body": "Saluran folder dan mesej fail dimuat naik terus ke akaun Telegram anda.",
+    "sponsors_title": "Penaja",
+    "sponsors_body": "Kandungan penaja dimuat hanya dalam kawasan iklan berlabel. Aktiviti fail tidak pernah dihantar kepada penaja.",
+    "crash_title": "Laporan ranap",
+    "crash_body": "Hanya selepas persetujuan: versi aplikasi, platform, jenis ralat dan nama fungsi yang dibersihkan."
+  },
+  "theme_names": {
+    "default_dark": "Gelap lalai",
+    "charcoal": "Arang",
+    "cyber_teal": "Hijau kebiruan siber",
+    "default_light": "Terang lalai",
+    "ocean": "Lautan",
+    "forest": "Hutan",
+    "plum": "Plum ungu",
+    "paper": "Kertas",
+    "rose": "Mawar",
+    "mint": "Pudina",
+    "sky": "Langit"
+  },
+  "advanced_copy": {
+    "rest_description": "Titik akhir automasi setempat dan kunci API",
+    "webdav_description": "Akses Finder dan pengurus fail",
+    "proxy_description": "Tetapan SOCKS5 dan jambatan HTTP",
+    "vpn_title": "VPN dan rangkaian",
+    "vpn_description": "Cubaan semula, lebar jalur dan pelarasan pusat data"
+  },
+  "settings_sync_copy": {
+    "replace_title": "Ganti sandaran tetapan?",
+    "replace_description": "Sandaran disulitkan terkini datang daripada peranti lain. Muat naik akan menggantikannya dengan pilihan selamat semasa peranti ini.",
+    "replace": "Ganti sandaran",
+    "uploaded": "Tetapan disulitkan dimuat naik ke Mesej Tersimpan Telegram.",
+    "apply_title": "Gunakan tetapan daripada Telegram?",
+    "apply_description": "Pilihan paparan, pemindahan, rangkaian dan penyulitan yang disegerakkan akan menggantikan nilai setempatnya. Kelayakan dan data pengaktifan tidak berubah.",
+    "apply": "Gunakan tetapan",
+    "downloaded": "Tetapan disulitkan dimuat turun dan digunakan.",
+    "title": "Penyegerakan tetapan disulitkan",
+    "description": "Pindahkan pilihan selamat aplikasi antara peranti secara manual melalui Mesej Tersimpan Telegram anda. Telegram Drive tidak mengendalikan pelayan penyegerakan.",
+    "enable": "Aktifkan penyegerakan tetapan disulitkan",
+    "warning": "Frasa laluan anda tidak boleh dipulihkan.",
+    "exclusions": "Ia digunakan setempat dan tidak pernah disimpan atau dimuat naik. Mesej Telegram disulitkan mungkin terlihat dalam Mesej Tersimpan. Kata laluan, kunci API/WebDAV, butiran proksi, pengaktifan supporter, persetujuan laporan ranap dan data fail sentiasa dikecualikan.",
+    "passphrase": "Frasa laluan penyegerakan",
+    "placeholder": "Sekurang-kurangnya 12 aksara",
+    "upload": "Muat naik daripada peranti ini",
+    "download": "Muat turun dan gunakan",
+    "refresh": "Segarkan status penyegerakan tetapan",
+    "latest": "Sandaran terkini: {{date}} · {{device}}",
+    "this_device": "dimuat naik oleh peranti ini",
+    "other_device": "dimuat naik oleh peranti lain",
+    "none": "Tiada sandaran tetapan disulitkan dalam 1,000 Mesej Tersimpan terkini."
   }
 }

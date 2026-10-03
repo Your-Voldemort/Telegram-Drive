@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { toast } from 'sonner';
 import type Hls from 'hls.js';
-import { TelegramFile, StreamingQuality, TranscodePrepareResult, TranscodeJobPhase, TranscodeCapabilities, MasterPlaylistInfo, QUALITY_LABELS, HLS_QUALITIES } from '../../../types';
+import { TelegramFile, StreamingQuality, TranscodePrepareResult, TranscodeJobPhase, TranscodeCapabilities, MasterPlaylistInfo, qualityLabel, HLS_QUALITIES } from '../../../types';
 import { useAdaptiveStreaming } from '../../../hooks/useAdaptiveStreaming';
 import { QualitySelector } from '../../shared/QualitySelector';
 import { FfmpegInstallNotice } from '../../shared/FfmpegInstallNotice';
@@ -1112,7 +1112,7 @@ export function AdaptiveMediaPlayer({
                     <div className={`absolute ${isFullscreen ? 'bottom-16 left-4' : 'top-3 right-3'} z-20 flex items-center gap-2`}>
                         {/* Quality / mode badge */}
                         <div className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-xs font-medium text-white/90 shadow-lg pointer-events-none">
-                            {isHlsMode && hlsQuality ? QUALITY_LABELS[hlsQuality] : `${effectiveQuality === 'original' ? 'Original' : QUALITY_LABELS[effectiveQuality]}${measuredKbps > 0 && effectiveQuality !== 'original' ? ` · ${(measuredKbps / 1000).toFixed(0)}k` : ''}`}
+                            {isHlsMode && hlsQuality ? qualityLabel(hlsQuality, i18n.t('settings.original')) : `${qualityLabel(effectiveQuality, i18n.t('settings.original'))}${measuredKbps > 0 && effectiveQuality !== 'original' ? ` · ${(measuredKbps / 1000).toFixed(0)}k` : ''}`}
                         </div>
                         {/* Resolution badge */}
                         {(sourceResolution || playingResolution) && (
@@ -1142,7 +1142,7 @@ export function AdaptiveMediaPlayer({
                             </div>
                             <div className="flex justify-between gap-4">
                                 <span className="text-white/40">{i18n.t('viewer.cap')}</span>
-                                <span>{effectiveQuality === 'original' ? i18n.t("settings.unlimited") : `${QUALITY_LABELS[effectiveQuality]}${!transcodeCapabilities?.available ? ' (throttle)' : ''}`}</span>
+                                <span>{effectiveQuality === 'original' ? i18n.t("settings.unlimited") : `${qualityLabel(effectiveQuality, i18n.t('settings.original'))}${!transcodeCapabilities?.available ? ' (throttle)' : ''}`}</span>
                             </div>
                             <div className="flex justify-between gap-4">
                                 <span className="text-white/40">{i18n.t('viewer.buffered')}</span>
@@ -1203,7 +1203,7 @@ export function AdaptiveMediaPlayer({
                                     onMouseEnter={() => setShowVolumeSlider(true)}
                                     onMouseLeave={() => setShowVolumeSlider(false)}
                                 >
-                                    <button onClick={toggleMute} className="viewer-control text-white/60" title={isMuted ? 'Unmute' : i18n.t('viewer.mute')}>
+                                    <button onClick={toggleMute} className="viewer-control text-white/60" title={isMuted ? i18n.t('viewer.unmute') : i18n.t('viewer.mute')}>
                                         {isMuted || volume === 0 ? <VolumeX className="w-4 h-4" /> : volume < 0.5 ? <Volume1 className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                                     </button>
                                     <div className={`overflow-hidden transition-all duration-200 ${showVolumeSlider ? 'w-20 opacity-100' : 'w-0 opacity-0'}`}>
@@ -1266,7 +1266,7 @@ export function AdaptiveMediaPlayer({
                         <h3 className="max-w-md truncate text-ui font-medium text-white" title={file.name}>{file.name}</h3>
                         <p className="flex items-center gap-2 text-badge text-white/40">
                             {isHlsMode && hlsQuality && (
-                                <span className="text-telegram-primary">{QUALITY_LABELS[hlsQuality]}</span>
+                                <span className="text-telegram-primary">{qualityLabel(hlsQuality, i18n.t('settings.original'))}</span>
                             )}
                             {hasVideoTrack && !isHlsMode && tracks.find(t => t.type === 'video') && (
                                 <span>

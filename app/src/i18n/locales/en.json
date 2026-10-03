@@ -86,7 +86,14 @@
     "language_load_failed": "Local language files could not be loaded. Reload the app to try again.",
     "action_name": "{{action}} {{name}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "Sign Out"
+    "sign_out": "Sign Out",
+    "browser_picker": "Browser Picker",
+    "system": "System",
+    "download_destination": "Select Download Destination",
+    "download_folder_to": "Download Folder To…",
+    "upload_folder_picker": "Select Folder to Upload",
+    "show_in_folder": "Show in folder",
+    "webdav_settings": "WebDAV settings"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -697,7 +704,8 @@
     "close_ad": "Close ad",
     "closes_in": "Closes in {{seconds}}s",
     "auto_close_label": "Sponsored advertisement — closes automatically in {{seconds}} seconds",
-    "view_offer": "View offer"
+    "view_offer": "View offer",
+    "thanks": "Thanks for your support!"
   },
   "supporter_offer": {
     "eyebrow": "Support Telegram Drive",
@@ -1166,7 +1174,8 @@
     "donate_btc": "Donate BTC",
     "nav_title": "Lifetime License",
     "purchased_title": "Lifetime license purchased",
-    "manage_license": "License details and recovery"
+    "manage_license": "License details and recovery",
+    "recovery_example": "Example: XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "A new version ({{version}}) is available!",
@@ -1237,7 +1246,14 @@
     "loading_preview": "Loading preview…",
     "preview_error": "Preview Error",
     "preview_unsupported": "Preview not supported in app.",
-    "file_type": "File type:"
+    "file_type": "File type:",
+    "stream_failed": "Failed to initialize stream",
+    "pdf_document_failed": "Failed to load PDF document.",
+    "pdf_native_failed": "Failed to render PDF in WebView or open natively: {{error}}",
+    "pdf_path_failed": "Failed to fetch PDF preview path.",
+    "pdf_load_failed": "Failed to load PDF.",
+    "image_render_failed": "Failed to render image preview",
+    "unmute": "Unmute"
   },
   "operations": {
     "delete_file": "Delete File",
@@ -1440,5 +1456,135 @@
     "plain_description": "Upload normally for maximum compatibility and easy sharing.",
     "protect": "Store & protect",
     "protect_description": "Encrypt before upload using your configured protection settings."
+  },
+  "auth_copy": {
+    "qr_title": "QR-first secure sign in",
+    "qr_description": "Desktop sign-in uses Telegram's QR device flow. A one-time API ID and hash are still required by Telegram to identify this open-source client.",
+    "advanced": "Advanced client credentials",
+    "continue_phone": "Continue to phone sign in",
+    "continue_qr": "Continue to QR sign in",
+    "qr_path": "Settings > Devices > Link Desktop Device",
+    "help_intro": "Telegram Drive uses your Telegram account as the storage backend for a local-first file workspace. You'll need a Telegram account and API credentials to get started.",
+    "portal_heading": "Go to Telegram's Developer Portal",
+    "portal_instruction": "Visit <portal>my.telegram.org</portal> and log in with your phone number.",
+    "create_heading": "Create a New Application",
+    "create_instruction": "Click on \"API development tools\" and create a new application. Use any name and description you like.",
+    "copy_heading": "Copy Your Credentials",
+    "copy_instruction": "After creating the app, you'll see your {{apiId}} (a number) and {{apiHash}} (a string). Copy both and paste them into the fields on the previous screen.",
+    "hash_example": "Example: abcdef123456…",
+    "open_portal": "Open my.telegram.org",
+    "privacy": "🔒 Privacy:",
+    "connecting": "Connecting…",
+    "unlock": "Unlock",
+    "id_number": "API ID must be a number",
+    "no_spaces": "API ID and API Hash cannot contain spaces. Please remove any spaces.",
+    "credentials_required": "Both API ID and Hash are required."
+  },
+  "protection_labels": {
+    "decrypted": "Decrypted",
+    "encrypted": "Encrypted",
+    "key_missing": "Key Missing",
+    "newer_version": "Needs a newer app version",
+    "corrupt": "Corrupt",
+    "verifying": "Verifying",
+    "learn": "{{state}} — learn why this file is protected",
+    "explain": "{{state}}. Explain file protection",
+    "contract_error": "Unsupported encryption command contract {{version}}",
+    "settings_rejected": "Encryption settings were rejected: {{error}}",
+    "auth_export": "Authenticate before exporting vault recovery material",
+    "auth_check": "Authenticate before checking vault recovery material",
+    "auth_import": "Authenticate before importing vault recovery material",
+    "auth_change": "Authenticate before changing the vault passphrase",
+    "provide_credentials": "Provide encryption credentials"
+  },
+  "drive_intro": {
+    "drive_title": "Your Telegram account becomes the drive",
+    "drive_body": "Saved Messages is your home storage. Telegram Drive reads and writes files directly through your Telegram session.",
+    "folders_title": "Folders are private channels",
+    "folders_body": "Creating a folder creates a private Telegram channel owned by your account. The app presents those channels as a familiar drive.",
+    "protection_title": "Store normally or protect first",
+    "protection_body": "Every upload can be stored normally or protected locally before it reaches Telegram. Sharing and WebDAV remain explicit, opt-in actions.",
+    "progress": "Getting started · {{current}} of {{total}}",
+    "skip": "Skip drive introduction",
+    "progress_label": "Introduction progress",
+    "help": "Open Help & FAQ"
+  },
+  "help_topics": {
+    "storage_question": "Where are my files stored?",
+    "storage_answer": "Files are Telegram messages in Saved Messages or private channels created as folders. Telegram Drive does not operate a separate cloud storage account.",
+    "limits_question": "What are the practical limits?",
+    "limits_answer": "A single Telegram object is limited to 2 GB in this app. Very large folders may take time to index; the live message count shows sync progress.",
+    "protection_question": "What does Store & protect do?",
+    "protection_answer": "It encrypts file bytes locally before upload. Keep your vault passphrase and recovery bundle safe: Telegram cannot recover protected files for you.",
+    "sharing_question": "How does sharing work?",
+    "sharing_answer": "Choose a Telegram channel link, a local password-protected link, or WebDAV/REST. Local servers and capability URLs must be enabled explicitly.",
+    "guest_question": "Why does Finder Guest show an empty folder?",
+    "guest_answer": "WebDAV access is granted by the token embedded in the complete /dav/<token>/ URL. Guest or anonymous login has no token-scoped access.",
+    "more": "Need more help?",
+    "support": "Open support issues"
+  },
+  "shortcut_labels": {
+    "search": "Search files",
+    "select_all": "Select all files",
+    "open": "Open the selected file",
+    "rename": "Rename the selected file",
+    "download": "Download selection",
+    "share": "Share selection",
+    "delete": "Delete selection",
+    "close": "Close the active dialog or clear selection",
+    "show": "Show this shortcut reference"
+  },
+  "privacy_destinations": {
+    "device_title": "This device",
+    "device_body": "Settings, queue state, thumbnails, and encrypted vault material stay local.",
+    "telegram_body": "Folder channels and uploaded file messages go directly to your Telegram account.",
+    "sponsors_title": "Sponsors",
+    "sponsors_body": "Sponsor content loads only in labeled ad areas. File activity is never sent to sponsors.",
+    "crash_title": "Crash reports",
+    "crash_body": "Only after consent: app version, platform, error type, and sanitized function names."
+  },
+  "theme_names": {
+    "default_dark": "Default Dark",
+    "charcoal": "Charcoal",
+    "cyber_teal": "Cyber Teal",
+    "default_light": "Default Light",
+    "ocean": "Ocean",
+    "forest": "Forest",
+    "plum": "Plum",
+    "paper": "Paper",
+    "rose": "Rose",
+    "mint": "Mint",
+    "sky": "Sky"
+  },
+  "advanced_copy": {
+    "rest_description": "Local automation endpoint and API key",
+    "webdav_description": "Finder and file-manager access",
+    "proxy_description": "SOCKS5 and HTTP bridge settings",
+    "vpn_title": "VPN & network",
+    "vpn_description": "Retries, bandwidth, and data-center tuning"
+  },
+  "settings_sync_copy": {
+    "replace_title": "Replace the settings backup?",
+    "replace_description": "The latest encrypted backup came from another device. Uploading will replace it with this device’s current safe preferences.",
+    "replace": "Replace backup",
+    "uploaded": "Encrypted settings uploaded to Telegram Saved Messages.",
+    "apply_title": "Apply settings from Telegram?",
+    "apply_description": "Synced display, transfer, network-tuning, and encryption preferences will replace their local values. Credentials and activation data are not changed.",
+    "apply": "Apply settings",
+    "downloaded": "Encrypted settings downloaded and applied.",
+    "title": "Encrypted settings sync",
+    "description": "Manually move safe app preferences between devices through your own Telegram Saved Messages. Telegram Drive operates no sync server.",
+    "enable": "Enable encrypted settings sync",
+    "warning": "Your passphrase cannot be recovered.",
+    "exclusions": "It is used locally and is never stored or uploaded. The encrypted Telegram message may be visible in Saved Messages. Passwords, API/WebDAV keys, proxy details, supporter activation, crash consent, and file data are always excluded.",
+    "passphrase": "Sync passphrase",
+    "placeholder": "At least 12 characters",
+    "upload": "Upload this device",
+    "download": "Download and apply",
+    "refresh": "Refresh settings sync status",
+    "latest": "Latest backup: {{date}} · {{device}}",
+    "this_device": "uploaded by this device",
+    "other_device": "uploaded by another device",
+    "none": "No encrypted settings backup was found in the latest 1,000 Saved Messages."
   }
 }

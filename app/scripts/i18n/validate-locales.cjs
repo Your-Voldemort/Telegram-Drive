@@ -18,6 +18,14 @@ function validate() {
   const invariants = loadInvariantAllowlist();
   const allowKeys = new Set(invariants.keys || []);
   const allowTokens = new Set(invariants.tokens || []);
+  const largeLocales = new Set(['ar', 'de', 'es', 'fr', 'hi', 'id', 'ko', 'pt-BR', 'ru', 'tr', 'zh-CN']);
+  function copyExempt(locale, key, value) {
+    // Older global exceptions included live Folder Sync prose. These release
+    // locales must translate it even while other locales retain that debt.
+    if (largeLocales.has(locale) && (key === 'settings.tab_sync' || /^(settings\.sync|sync\.status|sync\.conflict)\./.test(key))) return false;
+    return allowKeys.has(key) || allowTokens.has(value) || (invariants.localeKeys?.[locale] || []).includes(key);
+  }
+
   let en;
   try { en = loadLocale('en'); }
   catch (error) { console.error(`[en] [json_invalid] ${error.message}`); process.exit(1); }
@@ -46,7 +54,6 @@ function validate() {
     try { target = loadLocale(locale); }
     catch (error) { errors.push(`[${locale}] [json_invalid] ${error.message}`); continue; }
     copiedEnglishCounts[locale] = 0;
-    const allowLocaleKeys = new Set(invariants.localeKeys?.[locale] || []);
     const categories = new Intl.PluralRules(locale).resolvedOptions().pluralCategories;
     for (const base of pluralBases) {
       for (const category of categories) {
@@ -61,7 +68,7 @@ function validate() {
         continue;
       }
       checkValue(locale, key, value, reference, Boolean(pluralFor(key)));
-      if (hasStaticWords(reference) && reference === value && typeof value === 'string' && value.trim() && !allowKeys.has(key) && !allowTokens.has(value) && !allowLocaleKeys.has(key)) copiedEnglishCounts[locale]++;
+      if (hasStaticWords(reference) && reference === value && typeof value === 'string' && value.trim() && !copyExempt(locale, key, value)) copiedEnglishCounts[locale]++;
     }
     for (const [key, value] of Object.entries(target.flat)) {
       if (en.flat[key] !== undefined) continue;
@@ -72,7 +79,7 @@ function validate() {
         const referenceKey = plural[1] + '_other';
         const reference = en.flat[referenceKey];
         checkValue(locale, key, value, reference, true);
-        if (hasStaticWords(reference) && reference === value && typeof value === 'string' && value.trim() && !allowKeys.has(key) && !allowKeys.has(referenceKey) && !allowTokens.has(value) && !allowLocaleKeys.has(key) && !allowLocaleKeys.has(referenceKey)) copiedEnglishCounts[locale]++;
+        if (hasStaticWords(reference) && reference === value && typeof value === 'string' && value.trim() && !copyExempt(locale, key, value) && !copyExempt(locale, referenceKey, value)) copiedEnglishCounts[locale]++;
       }
     }
   }

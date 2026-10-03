@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
@@ -57,7 +58,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         try {
             const caps = await invoke<EncryptionCapabilities>('cmd_get_encryption_capabilities');
             if (caps.contract_version !== 2) {
-                throw new Error(`Unsupported encryption command contract ${String(caps.contract_version)}`);
+                throw new Error(i18n.t('protection_labels.contract_error', { version: String(caps.contract_version) }));
             }
             setCapabilities(caps);
             setCapabilityState(
@@ -119,7 +120,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         invoke<EncryptionSettings>('cmd_update_encryption_settings', { settings: effectiveSettings })
             .then(setSettings)
             .catch(error => {
-                setCapabilityError(previous => previous ?? `Encryption settings were rejected: ${String(error)}`);
+                setCapabilityError(previous => previous ?? i18n.t('protection_labels.settings_rejected', { error: String(error) }));
             });
     }, [
         appSettings.encryptionAutoLockMinutes,

@@ -86,7 +86,14 @@
     "language_load_failed": "Không thể tải các tệp ngôn ngữ cục bộ. Hãy tải lại ứng dụng để thử lại.",
     "action_name": "{{action}} {{name}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "Đăng xuất"
+    "sign_out": "Đăng xuất",
+    "browser_picker": "Bộ chọn của trình duyệt",
+    "system": "Hệ thống",
+    "download_destination": "Chọn đích tải xuống",
+    "download_folder_to": "Tải thư mục xuống…",
+    "upload_folder_picker": "Chọn thư mục để tải lên",
+    "show_in_folder": "Hiện trong thư mục",
+    "webdav_settings": "Cài đặt WebDAV"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -569,7 +576,8 @@
     "close_ad": "Đóng quảng cáo",
     "closes_in": "Đóng sau {{seconds}} giây",
     "auto_close_label": "Quảng cáo tài trợ — tự động đóng sau {{seconds}} giây",
-    "view_offer": "Xem ưu đãi"
+    "view_offer": "Xem ưu đãi",
+    "thanks": "Cảm ơn sự ủng hộ của bạn!"
   },
   "supporter_offer": {
     "eyebrow": "Ủng hộ Telegram Drive",
@@ -1166,7 +1174,8 @@
     "donate_btc": "Đóng góp BTC",
     "nav_title": "Giấy phép trọn đời",
     "purchased_title": "Đã mua giấy phép trọn đời",
-    "manage_license": "Chi tiết giấy phép và khôi phục"
+    "manage_license": "Chi tiết giấy phép và khôi phục",
+    "recovery_example": "Ví dụ: XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "Có phiên bản mới ({{version}})!",
@@ -1237,7 +1246,14 @@
     "loading_preview": "Đang tải bản xem trước…",
     "preview_error": "Lỗi xem trước",
     "preview_unsupported": "Ứng dụng không hỗ trợ xem trước.",
-    "file_type": "Loại tệp:"
+    "file_type": "Loại tệp:",
+    "stream_failed": "Không thể khởi tạo luồng",
+    "pdf_document_failed": "Không thể tải tài liệu PDF.",
+    "pdf_native_failed": "Không thể hiển thị PDF trong WebView hoặc mở bằng ứng dụng gốc: {{error}}",
+    "pdf_path_failed": "Không thể lấy đường dẫn xem trước PDF.",
+    "pdf_load_failed": "Không thể tải PDF.",
+    "image_render_failed": "Không thể hiển thị ảnh xem trước",
+    "unmute": "Bật tiếng"
   },
   "operations": {
     "delete_file": "Xóa tệp",
@@ -1440,5 +1456,135 @@
     "plain_description": "Tải lên thông thường để tương thích tối đa và chia sẻ dễ dàng.",
     "protect": "Lưu và bảo vệ",
     "protect_description": "Mã hóa trước khi tải lên bằng thiết lập bảo vệ đã cấu hình."
+  },
+  "auth_copy": {
+    "qr_title": "Đăng nhập an toàn ưu tiên QR",
+    "qr_description": "Đăng nhập trên máy tính dùng quy trình thiết bị QR của Telegram. Telegram vẫn yêu cầu nhập API ID và hash một lần để nhận diện ứng dụng khách mã nguồn mở này.",
+    "advanced": "Thông tin xác thực nâng cao của ứng dụng khách",
+    "continue_phone": "Tiếp tục đăng nhập bằng điện thoại",
+    "continue_qr": "Tiếp tục đăng nhập bằng QR",
+    "qr_path": "Cài đặt > Thiết bị > Liên kết thiết bị máy tính",
+    "help_intro": "Telegram Drive dùng tài khoản Telegram của bạn làm kho lưu trữ cho không gian tệp ưu tiên sử dụng cục bộ. Bạn cần tài khoản Telegram và thông tin xác thực API để bắt đầu.",
+    "portal_heading": "Đến cổng nhà phát triển Telegram",
+    "portal_instruction": "Truy cập <portal>my.telegram.org</portal> và đăng nhập bằng số điện thoại.",
+    "create_heading": "Tạo ứng dụng mới",
+    "create_instruction": "Nhấp \"API development tools\" và tạo ứng dụng mới. Bạn có thể dùng tên và mô tả tùy ý.",
+    "copy_heading": "Sao chép thông tin xác thực",
+    "copy_instruction": "Sau khi tạo ứng dụng, bạn sẽ thấy {{apiId}} (số) và {{apiHash}} (chuỗi). Sao chép cả hai và dán vào các ô ở màn hình trước.",
+    "hash_example": "Ví dụ: abcdef123456…",
+    "open_portal": "Mở my.telegram.org",
+    "privacy": "🔒 Quyền riêng tư:",
+    "connecting": "Đang kết nối…",
+    "unlock": "Mở khóa",
+    "id_number": "API ID phải là một số",
+    "no_spaces": "API ID và API Hash không được chứa dấu cách. Hãy xóa dấu cách.",
+    "credentials_required": "Cần cả API ID và Hash."
+  },
+  "protection_labels": {
+    "decrypted": "Đã giải mã",
+    "encrypted": "Đã mã hóa",
+    "key_missing": "Thiếu khóa",
+    "newer_version": "Cần phiên bản ứng dụng mới hơn",
+    "corrupt": "Bị hỏng",
+    "verifying": "Đang xác minh",
+    "learn": "{{state}} — tìm hiểu vì sao tệp này được bảo vệ",
+    "explain": "{{state}}. Giải thích bảo vệ tệp",
+    "contract_error": "Hợp đồng lệnh mã hóa không được hỗ trợ: {{version}}",
+    "settings_rejected": "Cài đặt mã hóa bị từ chối: {{error}}",
+    "auth_export": "Xác thực trước khi xuất dữ liệu khôi phục kho",
+    "auth_check": "Xác thực trước khi kiểm tra dữ liệu khôi phục kho",
+    "auth_import": "Xác thực trước khi nhập dữ liệu khôi phục kho",
+    "auth_change": "Xác thực trước khi đổi cụm mật khẩu kho",
+    "provide_credentials": "Cung cấp thông tin xác thực mã hóa"
+  },
+  "drive_intro": {
+    "drive_title": "Tài khoản Telegram trở thành ổ đĩa của bạn",
+    "drive_body": "Tin nhắn đã lưu là kho chính. Telegram Drive đọc và ghi tệp trực tiếp qua phiên Telegram của bạn.",
+    "folders_title": "Thư mục là các kênh riêng tư",
+    "folders_body": "Tạo thư mục sẽ tạo kênh Telegram riêng tư thuộc tài khoản của bạn. Ứng dụng hiển thị các kênh này như một ổ đĩa quen thuộc.",
+    "protection_title": "Lưu bình thường hoặc bảo vệ trước",
+    "protection_body": "Mỗi lần tải lên có thể lưu bình thường hoặc bảo vệ cục bộ trước khi đến Telegram. Chia sẻ và WebDAV vẫn là thao tác tùy chọn cần chủ động bật.",
+    "progress": "Bắt đầu · {{current}} / {{total}}",
+    "skip": "Bỏ qua giới thiệu ổ đĩa",
+    "progress_label": "Tiến trình giới thiệu",
+    "help": "Mở trợ giúp và câu hỏi thường gặp"
+  },
+  "help_topics": {
+    "storage_question": "Tệp của tôi được lưu ở đâu?",
+    "storage_answer": "Tệp là tin nhắn Telegram trong Tin nhắn đã lưu hoặc kênh riêng tư được tạo làm thư mục. Telegram Drive không vận hành tài khoản lưu trữ đám mây riêng.",
+    "limits_question": "Giới hạn thực tế là gì?",
+    "limits_answer": "Một đối tượng Telegram trong ứng dụng này bị giới hạn ở 2 GB. Thư mục rất lớn có thể cần thời gian lập chỉ mục; số tin nhắn trực tiếp cho biết tiến trình đồng bộ.",
+    "protection_question": "Lưu và bảo vệ làm gì?",
+    "protection_answer": "Mã hóa các byte tệp cục bộ trước khi tải lên. Giữ an toàn cụm mật khẩu kho và gói khôi phục: Telegram không thể khôi phục tệp được bảo vệ cho bạn.",
+    "sharing_question": "Chia sẻ hoạt động thế nào?",
+    "sharing_answer": "Chọn liên kết kênh Telegram, liên kết cục bộ có mật khẩu hoặc WebDAV/REST. Máy chủ cục bộ và URL truy cập phải được bật rõ ràng.",
+    "guest_question": "Vì sao Khách trong Finder hiển thị thư mục trống?",
+    "guest_answer": "Quyền WebDAV được cấp qua mã token trong URL đầy đủ /dav/<token>/. Đăng nhập khách hoặc ẩn danh không có quyền trong phạm vi token.",
+    "more": "Cần thêm trợ giúp?",
+    "support": "Mở vấn đề hỗ trợ"
+  },
+  "shortcut_labels": {
+    "search": "Tìm tệp",
+    "select_all": "Chọn tất cả tệp",
+    "open": "Mở tệp đã chọn",
+    "rename": "Đổi tên tệp đã chọn",
+    "download": "Tải lựa chọn xuống",
+    "share": "Chia sẻ lựa chọn",
+    "delete": "Xóa lựa chọn",
+    "close": "Đóng hộp thoại hiện tại hoặc bỏ chọn",
+    "show": "Hiện hướng dẫn phím tắt này"
+  },
+  "privacy_destinations": {
+    "device_title": "Thiết bị này",
+    "device_body": "Cài đặt, trạng thái hàng đợi, hình thu nhỏ và dữ liệu kho mã hóa được giữ cục bộ.",
+    "telegram_body": "Kênh thư mục và tin nhắn tệp đã tải lên đi thẳng tới tài khoản Telegram của bạn.",
+    "sponsors_title": "Nhà tài trợ",
+    "sponsors_body": "Nội dung tài trợ chỉ tải trong vùng quảng cáo có nhãn. Hoạt động tệp không bao giờ được gửi tới nhà tài trợ.",
+    "crash_title": "Báo cáo sự cố",
+    "crash_body": "Chỉ sau khi đồng ý: phiên bản ứng dụng, nền tảng, loại lỗi và tên hàm đã loại bỏ thông tin nhạy cảm."
+  },
+  "theme_names": {
+    "default_dark": "Tối mặc định",
+    "charcoal": "Than",
+    "cyber_teal": "Xanh ngọc mạng",
+    "default_light": "Sáng mặc định",
+    "ocean": "Đại dương",
+    "forest": "Rừng",
+    "plum": "Mận",
+    "paper": "Giấy",
+    "rose": "Hoa hồng",
+    "mint": "Bạc hà",
+    "sky": "Bầu trời"
+  },
+  "advanced_copy": {
+    "rest_description": "Điểm cuối tự động hóa cục bộ và khóa API",
+    "webdav_description": "Truy cập cho Finder và trình quản lý tệp",
+    "proxy_description": "Cài đặt SOCKS5 và cầu HTTP",
+    "vpn_title": "VPN và mạng",
+    "vpn_description": "Thử lại, băng thông và điều chỉnh trung tâm dữ liệu"
+  },
+  "settings_sync_copy": {
+    "replace_title": "Thay bản sao lưu cài đặt?",
+    "replace_description": "Bản sao lưu mã hóa mới nhất đến từ thiết bị khác. Tải lên sẽ thay nó bằng tùy chọn an toàn hiện tại của thiết bị này.",
+    "replace": "Thay bản sao lưu",
+    "uploaded": "Đã tải cài đặt mã hóa lên Tin nhắn đã lưu của Telegram.",
+    "apply_title": "Áp dụng cài đặt từ Telegram?",
+    "apply_description": "Tùy chọn hiển thị, truyền, mạng và mã hóa đã đồng bộ sẽ thay các giá trị cục bộ. Thông tin xác thực và dữ liệu kích hoạt không thay đổi.",
+    "apply": "Áp dụng cài đặt",
+    "downloaded": "Đã tải xuống và áp dụng cài đặt mã hóa.",
+    "title": "Đồng bộ cài đặt mã hóa",
+    "description": "Chuyển thủ công tùy chọn an toàn giữa thiết bị qua Tin nhắn đã lưu Telegram của bạn. Telegram Drive không vận hành máy chủ đồng bộ.",
+    "enable": "Bật đồng bộ cài đặt mã hóa",
+    "warning": "Không thể khôi phục cụm mật khẩu của bạn.",
+    "exclusions": "Nó chỉ dùng cục bộ, không bao giờ được lưu hoặc tải lên. Tin nhắn Telegram mã hóa có thể hiện trong Tin nhắn đã lưu. Mật khẩu, khóa API/WebDAV, chi tiết proxy, kích hoạt supporter, đồng ý báo cáo sự cố và dữ liệu tệp luôn bị loại trừ.",
+    "passphrase": "Cụm mật khẩu đồng bộ",
+    "placeholder": "Ít nhất 12 ký tự",
+    "upload": "Tải lên từ thiết bị này",
+    "download": "Tải xuống và áp dụng",
+    "refresh": "Làm mới trạng thái đồng bộ cài đặt",
+    "latest": "Bản sao lưu mới nhất: {{date}} · {{device}}",
+    "this_device": "được tải lên bởi thiết bị này",
+    "other_device": "được tải lên bởi thiết bị khác",
+    "none": "Không tìm thấy bản sao lưu cài đặt mã hóa trong 1,000 Tin nhắn đã lưu gần nhất."
   }
 }

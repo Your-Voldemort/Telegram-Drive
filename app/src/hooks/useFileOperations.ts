@@ -162,7 +162,7 @@ export function useFileOperations(
         };
         try {
             const dirPath = await pickWithFallback(
-                () => open({ directory: true, multiple: false, title: "Select Download Destination" }),
+                () => open({ directory: true, multiple: false, title: i18n.t('common.download_destination') }),
                 () => handleBulkDownload(),
                 {
                     errorTitle: 'Folder picker failed',
@@ -215,7 +215,7 @@ export function useFileOperations(
         try {
             const dirPath = await pickWithFallback(
                 () => open({
-                    directory: true, multiple: false, title: "Download Folder To..."
+                    directory: true, multiple: false, title: i18n.t('common.download_folder_to')
                 }),
                 () => handleDownloadFolder(),
                 {

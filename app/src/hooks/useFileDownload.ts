@@ -149,7 +149,7 @@ export function useFileDownload(
                     announceSupporterValueMoment('download_completed');
                     toast.success(i18n.t('transfer_copy.downloaded',{name:job.filename}), job.savePath ? {
                         action: {
-                            label: 'Show in folder',
+                            label: i18n.t('common.show_in_folder'),
                             onClick: () => { void revealItemInDir(job.savePath as string); },
                         },
                     } : undefined);
@@ -158,7 +158,7 @@ export function useFileDownload(
                         updateSetting('downloadWebdavTipSeen', true);
                         window.setTimeout(() => toast.info(i18n.t('transfer_copy.download_tip'), {
                             action: {
-                                label: 'WebDAV settings',
+                                label: i18n.t('common.webdav_settings'),
                                 onClick: () => window.dispatchEvent(new CustomEvent('telegram-drive-open-settings', { detail: { tab: 'webdav' } })),
                             },
                         }), 900);
@@ -543,7 +543,7 @@ export function useFileDownload(
                 announceSupporterValueMoment('download_completed');
                 toast.success(i18n.t('transfer_copy.downloaded',{name:item.filename}), !isAndroidPlatform && savePath ? {
                     action: {
-                        label: 'Show in folder',
+                        label: i18n.t('common.show_in_folder'),
                         onClick: () => { void revealItemInDir(savePath as string); },
                     },
                 } : undefined);
@@ -552,7 +552,7 @@ export function useFileDownload(
                     updateSetting('downloadWebdavTipSeen', true);
                     window.setTimeout(() => toast.info(i18n.t('transfer_copy.download_tip'), {
                         action: {
-                            label: 'WebDAV settings',
+                            label: i18n.t('common.webdav_settings'),
                             onClick: () => window.dispatchEvent(new CustomEvent('telegram-drive-open-settings', { detail: { tab: 'webdav' } })),
                         },
                     }), 900);
@@ -744,7 +744,7 @@ export function useFileDownload(
         }
 
         const dirPath = await pickWithFallback(
-            () => open({ directory: true, multiple: false, title: "Select Download Destination" }),
+            () => open({ directory: true, multiple: false, title: i18n.t('common.download_destination') }),
             () => queueBulkDownload(files, folderId),
             {
                 errorTitle: 'Folder picker failed',

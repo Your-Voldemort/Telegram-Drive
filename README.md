@@ -251,7 +251,7 @@ Telegram Drive supports a **System** language preference and these 24 selectable
 | Bengali (Bangladesh) | Indonesian | Filipino (Philippines) | Turkish |
 | Thai (Thailand) | Japanese | Korean | Vietnamese |
 
-Locale selection and formatting are production-supported. Some translated entries may still fall back to English, and full native-language, legal-copy, RTL, long-string, CJK, and accessibility review remains ongoing.
+Locale selection and formatting are production-supported. Authentication, encryption, desktop supporter copy and visible data arrays use canonical translations, and the eleven large locales have zero copied-English findings. Mobile follow-up changes remain local under the owner’s pre-commit hook. Noncritical English copy and full native-language, legal-copy, RTL, long-string, CJK and device review remain outstanding; see [the measured locale review](Docs/LOCALIZATION_BUDGET_REVIEW.md).
 
 ## Optional $5 lifetime ad-free supporter license
 

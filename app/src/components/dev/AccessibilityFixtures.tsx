@@ -1,3 +1,4 @@
+import { LocalizationArraysBrowserFixture } from './LocalizationArraysBrowserFixture';
 import {RuntimeCopyBrowserFixture} from './RuntimeCopyBrowserFixture';
 import { SupporterBrowserFixture } from './SupporterBrowserFixture';
 import { useEffect, useState } from 'react';
@@ -69,6 +70,8 @@ export default function AccessibilityFixtures() {
   );
 
   if (fixture === 'sponsor-mobile') return <main className="min-h-screen bg-app-canvas"><h1>Mobile sponsor placement fixture</h1><AdsterraBanner visible /></main>;
+
+  if (fixture === 'locale-arrays') return <LocalizationArraysBrowserFixture />;
 
   if (fixture === 'runtime-copy') return <RuntimeCopyBrowserFixture />;
 

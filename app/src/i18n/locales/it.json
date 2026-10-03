@@ -86,7 +86,14 @@
     "language_load_failed": "Impossibile caricare i file di lingua locali. Ricarica l’app per riprovare.",
     "action_name": "{{action}} {{name}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "Esci"
+    "sign_out": "Esci",
+    "browser_picker": "Selettore del browser",
+    "system": "Sistema",
+    "download_destination": "Seleziona destinazione del download",
+    "download_folder_to": "Scarica cartella in…",
+    "upload_folder_picker": "Seleziona cartella da caricare",
+    "show_in_folder": "Mostra nella cartella",
+    "webdav_settings": "Impostazioni WebDAV"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -573,7 +580,8 @@
     "close_ad": "Chiudi annuncio",
     "closes_in": "Si chiude tra {{seconds}} s",
     "auto_close_label": "Annuncio sponsorizzato — si chiude automaticamente tra {{seconds}} secondi",
-    "view_offer": "Visualizza offerta"
+    "view_offer": "Visualizza offerta",
+    "thanks": "Grazie per il tuo sostegno!"
   },
   "supporter_offer": {
     "eyebrow": "Sostieni Telegram Drive",
@@ -1173,7 +1181,8 @@
     "donate_btc": "Dona BTC",
     "nav_title": "Licenza a vita",
     "purchased_title": "Licenza a vita acquistata",
-    "manage_license": "Dettagli della licenza e ripristino"
+    "manage_license": "Dettagli della licenza e ripristino",
+    "recovery_example": "Esempio: XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "È disponibile una nuova versione ({{version}})!",
@@ -1244,7 +1253,14 @@
     "loading_preview": "Caricamento anteprima…",
     "preview_error": "Errore nell’anteprima",
     "preview_unsupported": "Anteprima non supportata nell’app.",
-    "file_type": "Tipo di file:"
+    "file_type": "Tipo di file:",
+    "stream_failed": "Impossibile inizializzare il flusso",
+    "pdf_document_failed": "Impossibile caricare il documento PDF.",
+    "pdf_native_failed": "Impossibile visualizzare il PDF in WebView o aprirlo nativamente: {{error}}",
+    "pdf_path_failed": "Impossibile ottenere il percorso di anteprima del PDF.",
+    "pdf_load_failed": "Impossibile caricare il PDF.",
+    "image_render_failed": "Impossibile visualizzare l’anteprima dell’immagine",
+    "unmute": "Riattiva audio"
   },
   "operations": {
     "delete_file": "Elimina file",
@@ -1447,5 +1463,135 @@
     "plain_description": "Carica normalmente per la massima compatibilità e una condivisione semplice.",
     "protect": "Conserva e proteggi",
     "protect_description": "Cifra prima del caricamento con le impostazioni di protezione configurate."
+  },
+  "auth_copy": {
+    "qr_title": "Accesso sicuro tramite QR",
+    "qr_description": "L’accesso desktop usa il flusso QR dei dispositivi Telegram. Telegram richiede ancora API ID e hash, inseriti una volta, per identificare questo client open source.",
+    "advanced": "Credenziali avanzate del client",
+    "continue_phone": "Continua all’accesso con telefono",
+    "continue_qr": "Continua all’accesso con QR",
+    "qr_path": "Impostazioni > Dispositivi > Collega dispositivo desktop",
+    "help_intro": "Telegram Drive usa il tuo account Telegram come archivio di uno spazio file che privilegia l’uso locale. Per iniziare servono un account Telegram e credenziali API.",
+    "portal_heading": "Vai al portale sviluppatori di Telegram",
+    "portal_instruction": "Visita <portal>my.telegram.org</portal> e accedi con il tuo numero di telefono.",
+    "create_heading": "Crea una nuova applicazione",
+    "create_instruction": "Fai clic su \"API development tools\" e crea un’applicazione. Usa il nome e la descrizione che preferisci.",
+    "copy_heading": "Copia le tue credenziali",
+    "copy_instruction": "Dopo aver creato l’app vedrai {{apiId}} (un numero) e {{apiHash}} (una stringa). Copiali entrambi nei campi della schermata precedente.",
+    "hash_example": "Esempio: abcdef123456…",
+    "open_portal": "Apri my.telegram.org",
+    "privacy": "🔒 Riservatezza:",
+    "connecting": "Connessione…",
+    "unlock": "Sblocca",
+    "id_number": "L’API ID deve essere un numero",
+    "no_spaces": "API ID e API Hash non possono contenere spazi. Rimuovi gli spazi.",
+    "credentials_required": "Sono richiesti sia API ID sia Hash."
+  },
+  "protection_labels": {
+    "decrypted": "Decifrato",
+    "encrypted": "Cifrato",
+    "key_missing": "Chiave mancante",
+    "newer_version": "Richiede una versione più recente dell’app",
+    "corrupt": "Danneggiato",
+    "verifying": "Verifica",
+    "learn": "{{state}} — scopri perché questo file è protetto",
+    "explain": "{{state}}. Spiega la protezione dei file",
+    "contract_error": "Contratto dei comandi di cifratura non supportato: {{version}}",
+    "settings_rejected": "Impostazioni di cifratura rifiutate: {{error}}",
+    "auth_export": "Autenticati prima di esportare i dati di recupero della cassaforte",
+    "auth_check": "Autenticati prima di verificare i dati di recupero della cassaforte",
+    "auth_import": "Autenticati prima di importare i dati di recupero della cassaforte",
+    "auth_change": "Autenticati prima di cambiare la frase segreta della cassaforte",
+    "provide_credentials": "Fornisci credenziali di cifratura"
+  },
+  "drive_intro": {
+    "drive_title": "Il tuo account Telegram diventa l’unità",
+    "drive_body": "Messaggi salvati è il tuo archivio principale. Telegram Drive legge e scrive file direttamente tramite la tua sessione Telegram.",
+    "folders_title": "Le cartelle sono canali privati",
+    "folders_body": "Creare una cartella crea un canale Telegram privato del tuo account. L’app presenta questi canali come un’unità familiare.",
+    "protection_title": "Archivia normalmente o proteggi prima",
+    "protection_body": "Ogni caricamento può essere archiviato normalmente o protetto localmente prima di arrivare a Telegram. Condivisione e WebDAV restano azioni esplicite e facoltative.",
+    "progress": "Primi passi · {{current}} di {{total}}",
+    "skip": "Salta l’introduzione all’unità",
+    "progress_label": "Avanzamento dell’introduzione",
+    "help": "Apri guida e FAQ"
+  },
+  "help_topics": {
+    "storage_question": "Dove sono archiviati i miei file?",
+    "storage_answer": "I file sono messaggi Telegram in Messaggi salvati o canali privati creati come cartelle. Telegram Drive non gestisce un account cloud separato.",
+    "limits_question": "Quali sono i limiti pratici?",
+    "limits_answer": "Un singolo oggetto Telegram è limitato a 2 GB in questa app. Le cartelle molto grandi richiedono tempo per l’indicizzazione; il conteggio dei messaggi mostra l’avanzamento della sincronizzazione.",
+    "protection_question": "Cosa fa Archivia e proteggi?",
+    "protection_answer": "Cifra i byte del file localmente prima del caricamento. Conserva la frase segreta della cassaforte e il pacchetto di recupero: Telegram non può recuperare i file protetti per te.",
+    "sharing_question": "Come funziona la condivisione?",
+    "sharing_answer": "Scegli un link a un canale Telegram, un link locale protetto da password o WebDAV/REST. Server locali e URL di accesso devono essere abilitati esplicitamente.",
+    "guest_question": "Perché Ospite in Finder mostra una cartella vuota?",
+    "guest_answer": "L’accesso WebDAV è concesso dal token nell’URL completo /dav/<token>/. L’accesso ospite o anonimo non dispone di permessi associati a un token.",
+    "more": "Serve altro aiuto?",
+    "support": "Apri richieste di assistenza"
+  },
+  "shortcut_labels": {
+    "search": "Cerca file",
+    "select_all": "Seleziona tutti i file",
+    "open": "Apri il file selezionato",
+    "rename": "Rinomina il file selezionato",
+    "download": "Scarica selezione",
+    "share": "Condividi selezione",
+    "delete": "Elimina selezione",
+    "close": "Chiudi la finestra attiva o cancella la selezione",
+    "show": "Mostra questa guida ai tasti rapidi"
+  },
+  "privacy_destinations": {
+    "device_title": "Questo dispositivo",
+    "device_body": "Impostazioni, stato delle code, miniature e materiale cifrato della cassaforte restano locali.",
+    "telegram_body": "Canali delle cartelle e messaggi dei file caricati vanno direttamente al tuo account Telegram.",
+    "sponsors_title": "Sponsor",
+    "sponsors_body": "I contenuti sponsorizzati si caricano solo nelle aree pubblicitarie segnalate. L’attività sui file non viene mai inviata agli sponsor.",
+    "crash_title": "Rapporti di arresto anomalo",
+    "crash_body": "Solo dopo il consenso: versione dell’app, piattaforma, tipo di errore e nomi delle funzioni ripuliti."
+  },
+  "theme_names": {
+    "default_dark": "Scuro predefinito",
+    "charcoal": "Carbone",
+    "cyber_teal": "Turchese cyber",
+    "default_light": "Chiaro predefinito",
+    "ocean": "Oceano",
+    "forest": "Foresta",
+    "plum": "Prugna",
+    "paper": "Carta",
+    "rose": "Rosa",
+    "mint": "Menta",
+    "sky": "Cielo"
+  },
+  "advanced_copy": {
+    "rest_description": "Endpoint di automazione locale e chiave API",
+    "webdav_description": "Accesso per Finder e gestori di file",
+    "proxy_description": "Impostazioni SOCKS5 e del bridge HTTP",
+    "vpn_title": "VPN e rete",
+    "vpn_description": "Tentativi, larghezza di banda e regolazione del centro dati"
+  },
+  "settings_sync_copy": {
+    "replace_title": "Sostituire il backup delle impostazioni?",
+    "replace_description": "L’ultimo backup cifrato proviene da un altro dispositivo. Il caricamento lo sostituirà con le preferenze sicure attuali di questo dispositivo.",
+    "replace": "Sostituisci backup",
+    "uploaded": "Impostazioni cifrate caricate in Messaggi salvati di Telegram.",
+    "apply_title": "Applicare impostazioni da Telegram?",
+    "apply_description": "Le preferenze sincronizzate di visualizzazione, trasferimento, rete e cifratura sostituiranno i valori locali. Credenziali e dati di attivazione non cambiano.",
+    "apply": "Applica impostazioni",
+    "downloaded": "Impostazioni cifrate scaricate e applicate.",
+    "title": "Sincronizzazione cifrata delle impostazioni",
+    "description": "Sposta manualmente preferenze sicure tra dispositivi tramite i tuoi Messaggi salvati Telegram. Telegram Drive non gestisce un server di sincronizzazione.",
+    "enable": "Abilita sincronizzazione cifrata delle impostazioni",
+    "warning": "La tua frase segreta non può essere recuperata.",
+    "exclusions": "È usata localmente e non viene mai salvata o caricata. Il messaggio Telegram cifrato può essere visibile in Messaggi salvati. Password, chiavi API/WebDAV, dettagli proxy, attivazione supporter, consenso ai rapporti di arresto e dati dei file sono sempre esclusi.",
+    "passphrase": "Frase segreta di sincronizzazione",
+    "placeholder": "Almeno 12 caratteri",
+    "upload": "Carica da questo dispositivo",
+    "download": "Scarica e applica",
+    "refresh": "Aggiorna stato della sincronizzazione delle impostazioni",
+    "latest": "Ultimo backup: {{date}} · {{device}}",
+    "this_device": "caricato da questo dispositivo",
+    "other_device": "caricato da un altro dispositivo",
+    "none": "Nessun backup cifrato delle impostazioni negli ultimi 1,000 Messaggi salvati."
   }
 }

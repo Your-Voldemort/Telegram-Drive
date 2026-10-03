@@ -86,7 +86,14 @@
     "language_load_failed": "Nie udało się wczytać lokalnych plików językowych. Uruchom aplikację ponownie i spróbuj jeszcze raz.",
     "action_name": "{{action}} {{name}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "Wyloguj się"
+    "sign_out": "Wyloguj się",
+    "browser_picker": "Wybór w przeglądarce",
+    "system": "Systemowy",
+    "download_destination": "Wybierz miejsce pobierania",
+    "download_folder_to": "Pobierz folder do…",
+    "upload_folder_picker": "Wybierz folder do wysłania",
+    "show_in_folder": "Pokaż w folderze",
+    "webdav_settings": "Ustawienia WebDAV"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -577,7 +584,8 @@
     "close_ad": "Zamknij reklamę",
     "closes_in": "Zamknięcie za {{seconds}} s",
     "auto_close_label": "Reklama sponsorowana — automatyczne zamknięcie za {{seconds}} s",
-    "view_offer": "Zobacz ofertę"
+    "view_offer": "Zobacz ofertę",
+    "thanks": "Dziękujemy za wsparcie!"
   },
   "supporter_offer": {
     "eyebrow": "Wesprzyj Telegram Drive",
@@ -1180,7 +1188,8 @@
     "donate_btc": "Przekaż BTC",
     "nav_title": "Licencja dożywotnia",
     "purchased_title": "Kupiono licencję dożywotnią",
-    "manage_license": "Szczegóły licencji i przywracanie"
+    "manage_license": "Szczegóły licencji i przywracanie",
+    "recovery_example": "Przykład: XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "Dostępna jest nowa wersja ({{version}})!",
@@ -1251,7 +1260,14 @@
     "loading_preview": "Ładowanie podglądu…",
     "preview_error": "Błąd podglądu",
     "preview_unsupported": "Podgląd nie jest obsługiwany w aplikacji.",
-    "file_type": "Typ pliku:"
+    "file_type": "Typ pliku:",
+    "stream_failed": "Nie udało się uruchomić strumienia",
+    "pdf_document_failed": "Nie udało się załadować dokumentu PDF.",
+    "pdf_native_failed": "Nie udało się wyświetlić PDF w WebView ani otworzyć go natywnie: {{error}}",
+    "pdf_path_failed": "Nie udało się pobrać ścieżki podglądu PDF.",
+    "pdf_load_failed": "Nie udało się załadować PDF.",
+    "image_render_failed": "Nie udało się wyświetlić podglądu obrazu",
+    "unmute": "Włącz dźwięk"
   },
   "operations": {
     "delete_file": "Usuń plik",
@@ -1454,5 +1470,135 @@
     "plain_description": "Wyślij standardowo, aby zapewnić największą zgodność i łatwe udostępnianie.",
     "protect": "Zapisz i chroń",
     "protect_description": "Zaszyfruj przed wysłaniem z użyciem skonfigurowanych ustawień ochrony."
+  },
+  "auth_copy": {
+    "qr_title": "Bezpieczne logowanie przez QR",
+    "qr_description": "Logowanie na komputerze używa procesu QR urządzeń Telegram. Telegram nadal wymaga jednorazowego podania API ID i skrótu, aby rozpoznać tego klienta o otwartym kodzie.",
+    "advanced": "Zaawansowane dane klienta",
+    "continue_phone": "Przejdź do logowania telefonem",
+    "continue_qr": "Przejdź do logowania przez QR",
+    "qr_path": "Ustawienia > Urządzenia > Połącz komputer",
+    "help_intro": "Telegram Drive używa konta Telegram jako magazynu przestrzeni plików z priorytetem pracy lokalnej. Na początek potrzebujesz konta Telegram i danych API.",
+    "portal_heading": "Przejdź do portalu programistów Telegram",
+    "portal_instruction": "Odwiedź <portal>my.telegram.org</portal> i zaloguj się numerem telefonu.",
+    "create_heading": "Utwórz nową aplikację",
+    "create_instruction": "Kliknij \"API development tools\" i utwórz aplikację. Możesz wybrać dowolną nazwę i opis.",
+    "copy_heading": "Skopiuj dane klienta",
+    "copy_instruction": "Po utworzeniu aplikacji zobaczysz {{apiId}} (liczbę) i {{apiHash}} (ciąg znaków). Skopiuj oba do pól na poprzednim ekranie.",
+    "hash_example": "Przykład: abcdef123456…",
+    "open_portal": "Otwórz my.telegram.org",
+    "privacy": "🔒 Prywatność:",
+    "connecting": "Łączenie…",
+    "unlock": "Odblokuj",
+    "id_number": "API ID musi być liczbą",
+    "no_spaces": "API ID i API Hash nie mogą zawierać spacji. Usuń spacje.",
+    "credentials_required": "Wymagane są zarówno API ID, jak i Hash."
+  },
+  "protection_labels": {
+    "decrypted": "Odszyfrowany",
+    "encrypted": "Zaszyfrowany",
+    "key_missing": "Brak klucza",
+    "newer_version": "Wymaga nowszej wersji aplikacji",
+    "corrupt": "Uszkodzony",
+    "verifying": "Weryfikacja",
+    "learn": "{{state}} — dowiedz się, dlaczego plik jest chroniony",
+    "explain": "{{state}}. Wyjaśnij ochronę plików",
+    "contract_error": "Nieobsługiwany kontrakt poleceń szyfrowania {{version}}",
+    "settings_rejected": "Ustawienia szyfrowania zostały odrzucone: {{error}}",
+    "auth_export": "Uwierzytelnij się przed eksportem danych odzyskiwania sejfu",
+    "auth_check": "Uwierzytelnij się przed sprawdzeniem danych odzyskiwania sejfu",
+    "auth_import": "Uwierzytelnij się przed importem danych odzyskiwania sejfu",
+    "auth_change": "Uwierzytelnij się przed zmianą hasła sejfu",
+    "provide_credentials": "Podaj dane szyfrowania"
+  },
+  "drive_intro": {
+    "drive_title": "Twoje konto Telegram staje się dyskiem",
+    "drive_body": "Zapisane wiadomości to główny magazyn. Telegram Drive odczytuje i zapisuje pliki bezpośrednio przez Twoją sesję Telegram.",
+    "folders_title": "Foldery są prywatnymi kanałami",
+    "folders_body": "Utworzenie folderu tworzy prywatny kanał Telegram należący do Twojego konta. Aplikacja pokazuje te kanały jako znajomy dysk.",
+    "protection_title": "Zapisuj zwyczajnie lub najpierw chroń",
+    "protection_body": "Każdy plik można zapisać zwyczajnie lub chronić lokalnie przed wysłaniem do Telegram. Udostępnianie i WebDAV pozostają wyraźnie wybieranymi opcjonalnymi działaniami.",
+    "progress": "Pierwsze kroki · {{current}} z {{total}}",
+    "skip": "Pomiń wprowadzenie do dysku",
+    "progress_label": "Postęp wprowadzenia",
+    "help": "Otwórz pomoc i FAQ"
+  },
+  "help_topics": {
+    "storage_question": "Gdzie są przechowywane moje pliki?",
+    "storage_answer": "Pliki są wiadomościami Telegram w Zapisanych wiadomościach lub prywatnych kanałach utworzonych jako foldery. Telegram Drive nie prowadzi osobnego konta magazynu w chmurze.",
+    "limits_question": "Jakie są praktyczne ograniczenia?",
+    "limits_answer": "Jeden obiekt Telegram w tej aplikacji jest ograniczony do 2 GB. Indeksowanie bardzo dużych folderów może potrwać; bieżąca liczba wiadomości pokazuje postęp synchronizacji.",
+    "protection_question": "Co robi Zapisz i chroń?",
+    "protection_answer": "Szyfruje bajty pliku lokalnie przed wysłaniem. Chroń hasło sejfu i pakiet odzyskiwania: Telegram nie może odzyskać Twoich chronionych plików.",
+    "sharing_question": "Jak działa udostępnianie?",
+    "sharing_answer": "Wybierz link kanału Telegram, lokalny link z hasłem lub WebDAV/REST. Lokalne serwery i adresy dostępu trzeba włączyć jawnie.",
+    "guest_question": "Dlaczego Gość w Finderze pokazuje pusty folder?",
+    "guest_answer": "Dostęp WebDAV przyznaje token w pełnym URL /dav/<token>/. Logowanie gościnne lub anonimowe nie ma dostępu powiązanego z tokenem.",
+    "more": "Potrzebujesz więcej pomocy?",
+    "support": "Otwórz zgłoszenia pomocy"
+  },
+  "shortcut_labels": {
+    "search": "Szukaj plików",
+    "select_all": "Zaznacz wszystkie pliki",
+    "open": "Otwórz wybrany plik",
+    "rename": "Zmień nazwę wybranego pliku",
+    "download": "Pobierz zaznaczenie",
+    "share": "Udostępnij zaznaczenie",
+    "delete": "Usuń zaznaczenie",
+    "close": "Zamknij aktywne okno lub wyczyść zaznaczenie",
+    "show": "Pokaż ten przewodnik po skrótach"
+  },
+  "privacy_destinations": {
+    "device_title": "To urządzenie",
+    "device_body": "Ustawienia, stan kolejek, miniatury i zaszyfrowane dane sejfu pozostają lokalne.",
+    "telegram_body": "Kanały folderów i wiadomości wysłanych plików trafiają bezpośrednio na Twoje konto Telegram.",
+    "sponsors_title": "Sponsorzy",
+    "sponsors_body": "Treści sponsorowane ładują się tylko w oznaczonych miejscach reklamowych. Aktywność plików nigdy nie jest wysyłana do sponsorów.",
+    "crash_title": "Raporty awarii",
+    "crash_body": "Tylko po zgodzie: wersja aplikacji, platforma, typ błędu i oczyszczone nazwy funkcji."
+  },
+  "theme_names": {
+    "default_dark": "Domyślny ciemny",
+    "charcoal": "Węgiel",
+    "cyber_teal": "Cyber-turkus",
+    "default_light": "Domyślny jasny",
+    "ocean": "Oceaniczny",
+    "forest": "Las",
+    "plum": "Śliwka",
+    "paper": "Papier",
+    "rose": "Róża",
+    "mint": "Mięta",
+    "sky": "Niebo"
+  },
+  "advanced_copy": {
+    "rest_description": "Lokalny punkt automatyzacji i klucz API",
+    "webdav_description": "Dostęp dla Findera i menedżerów plików",
+    "proxy_description": "Ustawienia SOCKS5 i mostu HTTP",
+    "vpn_title": "VPN i sieć",
+    "vpn_description": "Ponowienia, przepustowość i ustawienia centrum danych"
+  },
+  "settings_sync_copy": {
+    "replace_title": "Zastąpić kopię ustawień?",
+    "replace_description": "Ostatnia zaszyfrowana kopia pochodzi z innego urządzenia. Wysłanie zastąpi ją aktualnymi bezpiecznymi preferencjami tego urządzenia.",
+    "replace": "Zastąp kopię",
+    "uploaded": "Zaszyfrowane ustawienia wysłano do Zapisanych wiadomości Telegram.",
+    "apply_title": "Zastosować ustawienia z Telegram?",
+    "apply_description": "Zsynchronizowane preferencje wyświetlania, transferu, sieci i szyfrowania zastąpią lokalne wartości. Dane logowania i aktywacji nie zmienią się.",
+    "apply": "Zastosuj ustawienia",
+    "downloaded": "Zaszyfrowane ustawienia pobrano i zastosowano.",
+    "title": "Szyfrowana synchronizacja ustawień",
+    "description": "Przenoś bezpieczne preferencje ręcznie między urządzeniami przez własne Zapisane wiadomości Telegram. Telegram Drive nie prowadzi serwera synchronizacji.",
+    "enable": "Włącz szyfrowaną synchronizację ustawień",
+    "warning": "Hasła nie można odzyskać.",
+    "exclusions": "Jest używane lokalnie, nigdy nie jest zapisywane ani wysyłane. Zaszyfrowana wiadomość Telegram może być widoczna w Zapisanych wiadomościach. Hasła, klucze API/WebDAV, dane proxy, aktywacja supporter, zgoda na raporty awarii i dane plików są zawsze wykluczone.",
+    "passphrase": "Hasło synchronizacji",
+    "placeholder": "Co najmniej 12 znaków",
+    "upload": "Wyślij z tego urządzenia",
+    "download": "Pobierz i zastosuj",
+    "refresh": "Odśwież stan synchronizacji ustawień",
+    "latest": "Ostatnia kopia: {{date}} · {{device}}",
+    "this_device": "wysłana przez to urządzenie",
+    "other_device": "wysłana przez inne urządzenie",
+    "none": "Nie znaleziono zaszyfrowanej kopii ustawień w ostatnich 1,000 Zapisanych wiadomościach."
   }
 }

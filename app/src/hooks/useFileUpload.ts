@@ -650,7 +650,7 @@ export function useFileUpload(
         const destinationFolderId = activeFolderId;
         const folderPath = await pickWithFallback(
             async () => {
-                const selected = await open({ multiple: false, directory: true, title: 'Select Folder to Upload' });
+                const selected = await open({ multiple: false, directory: true, title: i18n.t('common.upload_folder_picker') });
                 if (!selected) return null;
                 const fp = Array.isArray(selected) ? selected[0] : selected;
                 return fp || null;

@@ -86,7 +86,14 @@
     "language_load_failed": "ローカルの言語ファイルを読み込めませんでした。アプリを再読み込みして、もう一度お試しください。",
     "action_name": "{{name}} — {{action}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "ログアウト"
+    "sign_out": "ログアウト",
+    "browser_picker": "ブラウザー選択画面",
+    "system": "システム",
+    "download_destination": "ダウンロード先を選択",
+    "download_folder_to": "フォルダーのダウンロード先…",
+    "upload_folder_picker": "アップロードするフォルダーを選択",
+    "show_in_folder": "フォルダーで表示",
+    "webdav_settings": "WebDAV設定"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -569,7 +576,8 @@
     "close_ad": "広告を閉じる",
     "closes_in": "{{seconds}}秒後に閉じます",
     "auto_close_label": "スポンサー広告 — {{seconds}}秒後に自動で閉じます",
-    "view_offer": "オファーを見る"
+    "view_offer": "オファーを見る",
+    "thanks": "ご支援ありがとうございます！"
   },
   "supporter_offer": {
     "eyebrow": "Telegram Drive をサポート",
@@ -1166,7 +1174,8 @@
     "donate_btc": "BTCで寄付",
     "nav_title": "永久ライセンス",
     "purchased_title": "永久ライセンス購入済み",
-    "manage_license": "ライセンスの詳細と復元"
+    "manage_license": "ライセンスの詳細と復元",
+    "recovery_example": "例：XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "新しいバージョン ({{version}}) が利用できます！",
@@ -1237,7 +1246,14 @@
     "loading_preview": "プレビューを読み込み中…",
     "preview_error": "プレビューエラー",
     "preview_unsupported": "アプリ内のプレビューには対応していません。",
-    "file_type": "ファイル形式："
+    "file_type": "ファイル形式：",
+    "stream_failed": "ストリームを初期化できませんでした",
+    "pdf_document_failed": "PDF文書を読み込めませんでした。",
+    "pdf_native_failed": "WebViewでのPDF表示またはネイティブでの起動に失敗しました：{{error}}",
+    "pdf_path_failed": "PDFプレビューのパスを取得できませんでした。",
+    "pdf_load_failed": "PDFを読み込めませんでした。",
+    "image_render_failed": "画像プレビューを表示できませんでした",
+    "unmute": "ミュート解除"
   },
   "operations": {
     "delete_file": "ファイルを削除",
@@ -1440,5 +1456,135 @@
     "plain_description": "互換性を最大限に保ち、簡単に共有するために通常のアップロードを行います。",
     "protect": "保存して保護",
     "protect_description": "設定済みの保護設定でアップロード前に暗号化します。"
+  },
+  "auth_copy": {
+    "qr_title": "QRを優先する安全なサインイン",
+    "qr_description": "デスクトップのサインインはTelegramのQRデバイス連携を使用します。このオープンソースクライアントを識別するため、Telegramは引き続きAPI IDとハッシュの初回入力を必要とします。",
+    "advanced": "高度なクライアント認証情報",
+    "continue_phone": "電話番号でのサインインへ進む",
+    "continue_qr": "QRでのサインインへ進む",
+    "qr_path": "設定 > デバイス > デスクトップデバイスをリンク",
+    "help_intro": "Telegram DriveはTelegramアカウントを、ローカル利用を優先するファイル作業領域の保存先として使います。開始するにはTelegramアカウントとAPI認証情報が必要です。",
+    "portal_heading": "Telegram開発者ポータルへ移動",
+    "portal_instruction": "<portal>my.telegram.org</portal>にアクセスし、電話番号でログインしてください。",
+    "create_heading": "新しいアプリケーションを作成",
+    "create_instruction": "\"API development tools\"をクリックして新しいアプリを作成します。名前と説明は自由に選べます。",
+    "copy_heading": "認証情報をコピー",
+    "copy_instruction": "作成後に{{apiId}}（数値）と{{apiHash}}（文字列）が表示されます。両方をコピーし、前の画面の入力欄に貼り付けてください。",
+    "hash_example": "例：abcdef123456…",
+    "open_portal": "my.telegram.orgを開く",
+    "privacy": "🔒 プライバシー：",
+    "connecting": "接続中…",
+    "unlock": "ロック解除",
+    "id_number": "API IDは数値である必要があります",
+    "no_spaces": "API IDとAPI Hashに空白は含められません。空白を削除してください。",
+    "credentials_required": "API IDとHashの両方が必要です。"
+  },
+  "protection_labels": {
+    "decrypted": "復号済み",
+    "encrypted": "暗号化済み",
+    "key_missing": "鍵がありません",
+    "newer_version": "新しいアプリバージョンが必要です",
+    "corrupt": "破損",
+    "verifying": "検証中",
+    "learn": "{{state}} — このファイルが保護される理由を確認",
+    "explain": "{{state}}。ファイル保護を説明",
+    "contract_error": "未対応の暗号化コマンド契約 {{version}}",
+    "settings_rejected": "暗号化設定が拒否されました：{{error}}",
+    "auth_export": "保管庫の復旧データを書き出す前に認証してください",
+    "auth_check": "保管庫の復旧データを確認する前に認証してください",
+    "auth_import": "保管庫の復旧データを読み込む前に認証してください",
+    "auth_change": "保管庫のパスフレーズを変更する前に認証してください",
+    "provide_credentials": "暗号化の認証情報を入力"
+  },
+  "drive_intro": {
+    "drive_title": "Telegramアカウントがドライブになります",
+    "drive_body": "保存したメッセージが主な保存先です。Telegram DriveはTelegramセッションを通してファイルを直接読み書きします。",
+    "folders_title": "フォルダーは非公開チャンネルです",
+    "folders_body": "フォルダーを作ると、アカウントが所有する非公開Telegramチャンネルが作成されます。アプリはこれらを使い慣れたドライブとして表示します。",
+    "protection_title": "通常保存または事前に保護",
+    "protection_body": "アップロードは通常保存するか、Telegramに届く前にローカルで保護できます。共有とWebDAVは明示的に選択する任意の操作です。",
+    "progress": "はじめに · {{current}} / {{total}}",
+    "skip": "ドライブの紹介をスキップ",
+    "progress_label": "紹介の進行状況",
+    "help": "ヘルプとFAQを開く"
+  },
+  "help_topics": {
+    "storage_question": "ファイルはどこに保存されますか？",
+    "storage_answer": "ファイルは保存したメッセージやフォルダー用の非公開チャンネルにあるTelegramメッセージです。Telegram Driveは独立したクラウド保存アカウントを運営しません。",
+    "limits_question": "実際の制限は何ですか？",
+    "limits_answer": "このアプリではTelegramの単一オブジェクトは2 GBまでです。非常に大きいフォルダーの索引作成には時間がかかります。リアルタイムのメッセージ数が同期の進行状況を示します。",
+    "protection_question": "保存して保護は何をしますか？",
+    "protection_answer": "アップロード前にファイルのバイトをローカルで暗号化します。保管庫のパスフレーズと復旧バンドルを安全に保管してください。Telegramは保護されたファイルを復旧できません。",
+    "sharing_question": "共有はどのように動作しますか？",
+    "sharing_answer": "Telegramチャンネルリンク、パスワード付きローカルリンク、またはWebDAV/RESTを選びます。ローカルサーバーとアクセスURLは明示的に有効にする必要があります。",
+    "guest_question": "Finderのゲストで空のフォルダーが表示されるのはなぜですか？",
+    "guest_answer": "WebDAVへのアクセスは完全な/dav/<token>/ URL内のトークンで許可されます。ゲストや匿名ログインにはトークンに基づくアクセス権がありません。",
+    "more": "さらにヘルプが必要ですか？",
+    "support": "サポートの問題を開く"
+  },
+  "shortcut_labels": {
+    "search": "ファイルを検索",
+    "select_all": "すべてのファイルを選択",
+    "open": "選択したファイルを開く",
+    "rename": "選択したファイルの名前を変更",
+    "download": "選択項目をダウンロード",
+    "share": "選択項目を共有",
+    "delete": "選択項目を削除",
+    "close": "現在のダイアログを閉じるか選択を解除",
+    "show": "このショートカットガイドを表示"
+  },
+  "privacy_destinations": {
+    "device_title": "このデバイス",
+    "device_body": "設定、キューの状態、サムネイル、暗号化された保管庫データはローカルに保存されます。",
+    "telegram_body": "フォルダーチャンネルとアップロードしたファイルのメッセージはTelegramアカウントへ直接送られます。",
+    "sponsors_title": "スポンサー",
+    "sponsors_body": "スポンサーコンテンツは広告と明記された領域にのみ読み込まれます。ファイル操作はスポンサーに送信されません。",
+    "crash_title": "クラッシュレポート",
+    "crash_body": "同意後のみ：アプリバージョン、プラットフォーム、エラーの種類、機密情報を除いた関数名。"
+  },
+  "theme_names": {
+    "default_dark": "標準ダーク",
+    "charcoal": "木炭",
+    "cyber_teal": "サイバー青緑",
+    "default_light": "標準ライト",
+    "ocean": "海",
+    "forest": "森",
+    "plum": "プラム",
+    "paper": "紙",
+    "rose": "バラ",
+    "mint": "ミント",
+    "sky": "空"
+  },
+  "advanced_copy": {
+    "rest_description": "ローカル自動化エンドポイントとAPIキー",
+    "webdav_description": "Finderとファイルマネージャーのアクセス",
+    "proxy_description": "SOCKS5とHTTPブリッジの設定",
+    "vpn_title": "VPNとネットワーク",
+    "vpn_description": "再試行、帯域幅、データセンターの調整"
+  },
+  "settings_sync_copy": {
+    "replace_title": "設定バックアップを置き換えますか？",
+    "replace_description": "最新の暗号化バックアップは別のデバイスから作成されました。アップロードすると、このデバイスの現在の安全な設定に置き換わります。",
+    "replace": "バックアップを置換",
+    "uploaded": "暗号化設定をTelegramの保存したメッセージにアップロードしました。",
+    "apply_title": "Telegramの設定を適用しますか？",
+    "apply_description": "同期した表示、転送、ネットワーク、暗号化の設定がローカルの値を置き換えます。認証情報や有効化データは変更されません。",
+    "apply": "設定を適用",
+    "downloaded": "暗号化設定をダウンロードして適用しました。",
+    "title": "暗号化設定の同期",
+    "description": "自分のTelegramの保存したメッセージを通して安全なアプリ設定をデバイス間で手動移動します。Telegram Driveは同期サーバーを運営しません。",
+    "enable": "暗号化設定の同期を有効化",
+    "warning": "パスフレーズは復旧できません。",
+    "exclusions": "ローカルで使用され、保存やアップロードはされません。暗号化されたTelegramメッセージは保存したメッセージに表示されることがあります。パスワード、API/WebDAVキー、プロキシ情報、supporter有効化、クラッシュ報告の同意、ファイルデータは常に除外されます。",
+    "passphrase": "同期パスフレーズ",
+    "placeholder": "12文字以上",
+    "upload": "このデバイスからアップロード",
+    "download": "ダウンロードして適用",
+    "refresh": "設定同期の状態を更新",
+    "latest": "最新バックアップ：{{date}} · {{device}}",
+    "this_device": "このデバイスからアップロード",
+    "other_device": "別のデバイスからアップロード",
+    "none": "最近の1,000件の保存したメッセージに暗号化設定バックアップはありません。"
   }
 }

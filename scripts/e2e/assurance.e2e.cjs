@@ -292,6 +292,19 @@ test('the locale validation CLI rejects missing plural forms and altered extra-f
     {locale: 'ar', key: 'items_few', rejected: true, diagnostic: true},
     {locale: 'ar', key: 'items_many', rejected: true, diagnostic: true},
   ]);
+  for (const [locale, catalog] of Object.entries(catalogs)) {
+    catalog.settings = {sync: {title: locale === 'en' ? 'Folder Sync' : locale + ' folder sync'}};
+    write('src/i18n/locales/' + locale + '.json', catalog);
+  }
+  write('src/i18n/invariant-allowlist.json', {keys: ['settings.sync.title'], tokens: []});
+  success(check());
+  catalogs.ar.settings.sync.title = 'Folder Sync';
+  write('src/i18n/locales/ar.json', catalogs.ar);
+  const copiedExemption = check();
+  assert.notEqual(copiedExemption.status, 0);
+  assert.match(copiedExemption.stderr, /copied_english_regression/);
+  catalogs.ar.settings.sync.title = 'ar folder sync';
+  write('src/i18n/locales/ar.json', catalogs.ar);
   success(check());
 });
 

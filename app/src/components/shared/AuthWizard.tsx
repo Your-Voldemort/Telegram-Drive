@@ -14,7 +14,7 @@ import {
     type CodeRequestResult,
 } from './auth/AuthSteps';
 
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import i18n from '../../i18n';
 
 function AuthThemeToggle() {
@@ -165,12 +165,12 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
         e.preventDefault();
 
         if (apiId.includes(' ') || apiHash.includes(' ')) {
-            setError("API ID and API Hash cannot contain spaces. Please remove any spaces.");
+            setError(t('auth_copy.no_spaces'));
             return;
         }
 
         if (!apiId || !apiHash) {
-            setError("Both API ID and Hash are required.");
+            setError(t('auth_copy.credentials_required'));
             return;
         }
         setError(null);
@@ -192,7 +192,7 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
         setLoading(true);
         try {
             const idInt = parseInt(apiId, 10);
-            if (isNaN(idInt)) throw new Error("API ID must be a number");
+            if (isNaN(idInt)) throw new Error(t('auth_copy.id_number'));
 
             const url = await invoke<string>("cmd_auth_qr_login", {
                 apiId: idInt,
@@ -274,7 +274,7 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
         setError(null);
         try {
             const idInt = parseInt(apiId, 10);
-            if (isNaN(idInt)) throw new Error("API ID must be a number");
+            if (isNaN(idInt)) throw new Error(t('auth_copy.id_number'));
 
             const codeRequest = await invoke<CodeRequestResult>("cmd_auth_request_code", {
                 phone,
@@ -300,7 +300,7 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
             } else if (signInResult.next_step === "password") {
                 setStep("password");
             } else {
-                setError("Unknown error");
+                setError(t('common.operation_failed'));
             }
         } catch (err: unknown) {
             handleAuthError(err);
@@ -318,7 +318,7 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
             if (passwordResult.success) {
                 onLogin();
             } else {
-                setError("Password verification failed.");
+                setError(t('common.operation_failed'));
             }
         } catch (err: unknown) {
             handleAuthError(err);
@@ -372,7 +372,7 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
             const target = new URL(codeDelivery.fragmentUrl);
             const isFragment = target.protocol === "https:"
                 && (target.hostname === "fragment.com" || target.hostname.endsWith(".fragment.com"));
-            if (!isFragment) throw new Error("Invalid Fragment login URL");
+            if (!isFragment) throw new Error(t('auth.fragment_url_invalid'));
             await open(target.toString());
         } catch {
             setError(t("auth.fragment_url_invalid"));
@@ -554,43 +554,43 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
                             <div className="space-y-5 text-app-text">
                                 <div className="rounded-control border border-app-accent/20 bg-app-selected p-3">
                                     <p className="text-ui leading-relaxed text-app-text-secondary">
-                                        <strong className="text-app-accent">{i18n.t("common.app_title")}</strong> uses your Telegram account as the storage backend for a local-first file workspace. You'll need a Telegram account and API credentials to get started.
+                                        {t('auth_copy.help_intro')}
                                     </p>
                                 </div>
 
                                 <div className="space-y-2">
                                     <h3 className="flex items-center gap-2 text-ui font-semibold">
                                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-app-accent text-badge font-semibold text-app-accent-contrast">1</span>
-                                        Go to Telegram's Developer Portal
+                                        {t('auth_copy.portal_heading')}
                                     </h3>
                                     <p className="ms-7 text-ui leading-relaxed text-app-text-secondary">
-                                        Visit <button type="button" onClick={(e) => { e.preventDefault(); open('https://my.telegram.org'); }} className="cursor-pointer text-app-accent underline hover:text-app-text">my.telegram.org</button> and log in with your phone number.
+                                        <Trans i18nKey="auth_copy.portal_instruction" components={{ portal: <button type="button" onClick={(e) => { e.preventDefault(); open('https://my.telegram.org'); }} className="cursor-pointer text-app-accent underline hover:text-app-text" /> }} />
                                     </p>
                                 </div>
 
                                 <div className="space-y-2">
                                     <h3 className="flex items-center gap-2 text-ui font-semibold">
                                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-app-accent text-badge font-semibold text-app-accent-contrast">2</span>
-                                        Create a New Application
+                                        {t('auth_copy.create_heading')}
                                     </h3>
                                     <p className="ms-7 text-ui leading-relaxed text-app-text-secondary">
-                                        Click on <strong>"API development tools"</strong> and create a new application. Use any name and description you like.
+                                        {t('auth_copy.create_instruction')}
                                     </p>
                                 </div>
 
                                 <div className="space-y-2">
                                     <h3 className="flex items-center gap-2 text-ui font-semibold">
                                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-app-accent text-badge font-semibold text-app-accent-contrast">3</span>
-                                        Copy Your Credentials
+                                        {t('auth_copy.copy_heading')}
                                     </h3>
                                     <p className="ms-7 text-ui leading-relaxed text-app-text-secondary">
-                                        After creating the app, you'll see your <strong>{i18n.t("auth.api_id")}</strong> (a number) and <strong>{i18n.t("auth.api_hash")}</strong> (a string). Copy both and paste them into the fields on the previous screen.
+                                        {t('auth_copy.copy_instruction', { apiId: t('auth.api_id'), apiHash: t('auth.api_hash') })}
                                     </p>
                                 </div>
 
                                 <div className="rounded-control border border-app-border bg-app-surface-sunken/35 p-3">
                                     <p className="text-metadata leading-relaxed text-app-text-secondary">
-                                        <strong>🔒 Privacy:</strong> {i18n.t("auth.privacy_note")}
+                                        <strong>{t('auth_copy.privacy')}</strong> {i18n.t("auth.privacy_note")}
                                     </p>
                                 </div>
 
@@ -600,7 +600,7 @@ export function AuthWizard({ onLogin }: { onLogin: () => void }) {
                                     className="quiet-control auth-primary-action"
                                 >
                                     <ExternalLink className="w-4 h-4" />
-                                    Open my.telegram.org
+                                    {t('auth_copy.open_portal')}
                                 </button>
                             </div>
                         </motion.div>

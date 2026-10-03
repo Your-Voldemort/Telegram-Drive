@@ -3,8 +3,8 @@
   "maxJavaScriptChunkBytes": 550000,
   "maxTotalJavaScriptBytes": 3300000,
   "maxTotalCssBytes": 140000,
-  "maxTotalLocaleDataBytes": 1800000,
-  "maxLocaleDataBytes": 125000,
+  "maxTotalLocaleDataBytes": 1952434,
+  "maxLocaleDataBytes": 138790,
   "routeJavaScriptBudgets": {
     "src/components/desktop/DesktopDashboard.tsx": 302000
   },

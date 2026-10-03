@@ -86,7 +86,14 @@
     "language_load_failed": "Hindi ma-load ang mga lokal na file ng wika. I-reload ang app upang subukang muli.",
     "action_name": "{{action}} {{name}}",
     "action_count": "{{action}} ({{count}})",
-    "sign_out": "Mag-log Out"
+    "sign_out": "Mag-log Out",
+    "browser_picker": "Tagapili sa browser",
+    "system": "Sistema",
+    "download_destination": "Piliin ang destinasyon ng download",
+    "download_folder_to": "I-download ang folder sa…",
+    "upload_folder_picker": "Piliin ang folder na ia-upload",
+    "show_in_folder": "Ipakita sa folder",
+    "webdav_settings": "Mga setting ng WebDAV"
   },
   "settings": {
     "tab_sync": "Folder Sync",
@@ -569,7 +576,8 @@
     "close_ad": "Isara ang ad",
     "closes_in": "Magsasara sa {{seconds}} s",
     "auto_close_label": "Naka-sponsor na patalastas — awtomatikong magsasara sa {{seconds}} segundo",
-    "view_offer": "Tingnan ang alok"
+    "view_offer": "Tingnan ang alok",
+    "thanks": "Salamat sa suporta mo!"
   },
   "supporter_offer": {
     "eyebrow": "Suportahan ang Telegram Drive",
@@ -1166,7 +1174,8 @@
     "donate_btc": "Mag-donate ng BTC",
     "nav_title": "Panghabambuhay na Lisensya",
     "purchased_title": "Nabili na ang panghabambuhay na lisensya",
-    "manage_license": "Mga detalye at pagbawi ng lisensya"
+    "manage_license": "Mga detalye at pagbawi ng lisensya",
+    "recovery_example": "Halimbawa: XXXXX-XXXXX-XXXXX-XXXXX"
   },
   "runtime": {
     "update_available": "May bagong bersyon ({{version}})!",
@@ -1237,7 +1246,14 @@
     "loading_preview": "Nilo-load ang preview…",
     "preview_error": "Error sa preview",
     "preview_unsupported": "Hindi suportado ng app ang preview.",
-    "file_type": "Uri ng file:"
+    "file_type": "Uri ng file:",
+    "stream_failed": "Hindi masimulan ang stream",
+    "pdf_document_failed": "Hindi ma-load ang dokumentong PDF.",
+    "pdf_native_failed": "Hindi maipakita ang PDF sa WebView o mabuksan nang native: {{error}}",
+    "pdf_path_failed": "Hindi makuha ang path ng PDF preview.",
+    "pdf_load_failed": "Hindi ma-load ang PDF.",
+    "image_render_failed": "Hindi maipakita ang image preview",
+    "unmute": "Ibalik ang tunog"
   },
   "operations": {
     "delete_file": "Tanggalin ang file",
@@ -1440,5 +1456,135 @@
     "plain_description": "Mag-upload nang normal para sa pinakamalawak na compatibility at madaling pagbabahagi.",
     "protect": "Iimbak at protektahan",
     "protect_description": "I-encrypt bago mag-upload gamit ang iyong itinakdang proteksyon."
+  },
+  "auth_copy": {
+    "qr_title": "Ligtas na pag-sign in gamit ang QR",
+    "qr_description": "Ginagamit ng desktop sign-in ang QR device flow ng Telegram. Kailangan pa rin ng Telegram ang isang beses na paglalagay ng API ID at hash para makilala ang open-source client na ito.",
+    "advanced": "Advanced na kredensiyal ng client",
+    "continue_phone": "Magpatuloy sa pag-sign in sa telepono",
+    "continue_qr": "Magpatuloy sa pag-sign in gamit ang QR",
+    "qr_path": "Mga Setting > Mga Device > I-link ang desktop device",
+    "help_intro": "Ginagamit ng Telegram Drive ang Telegram account mo bilang imbakan ng isang file workspace na inuuna ang lokal na paggamit. Kailangan mo ng Telegram account at API credentials para magsimula.",
+    "portal_heading": "Pumunta sa developer portal ng Telegram",
+    "portal_instruction": "Bisitahin ang <portal>my.telegram.org</portal> at mag-log in gamit ang numero ng telepono mo.",
+    "create_heading": "Gumawa ng bagong application",
+    "create_instruction": "I-click ang \"API development tools\" at gumawa ng application. Maaari kang gumamit ng anumang pangalan at paglalarawan.",
+    "copy_heading": "Kopyahin ang mga kredensiyal mo",
+    "copy_instruction": "Pagkatapos gumawa ng app, makikita mo ang {{apiId}} (numero) at {{apiHash}} (string). Kopyahin ang dalawa at ilagay sa mga field sa nakaraang screen.",
+    "hash_example": "Halimbawa: abcdef123456…",
+    "open_portal": "Buksan ang my.telegram.org",
+    "privacy": "🔒 Pagkapribado:",
+    "connecting": "Kumokonekta…",
+    "unlock": "I-unlock",
+    "id_number": "Dapat numero ang API ID",
+    "no_spaces": "Hindi maaaring may espasyo ang API ID at API Hash. Alisin ang mga espasyo.",
+    "credentials_required": "Kailangan ang parehong API ID at Hash."
+  },
+  "protection_labels": {
+    "decrypted": "Na-decrypt",
+    "encrypted": "Naka-encrypt",
+    "key_missing": "Nawawala ang key",
+    "newer_version": "Kailangan ng mas bagong bersiyon ng app",
+    "corrupt": "Sira",
+    "verifying": "Bineberipika",
+    "learn": "{{state}} — alamin kung bakit protektado ang file na ito",
+    "explain": "{{state}}. Ipaliwanag ang proteksiyon ng file",
+    "contract_error": "Hindi suportadong kontrata ng utos sa encryption {{version}}",
+    "settings_rejected": "Tinanggihan ang settings ng encryption: {{error}}",
+    "auth_export": "Magpatunay bago i-export ang recovery material ng vault",
+    "auth_check": "Magpatunay bago suriin ang recovery material ng vault",
+    "auth_import": "Magpatunay bago i-import ang recovery material ng vault",
+    "auth_change": "Magpatunay bago palitan ang passphrase ng vault",
+    "provide_credentials": "Ibigay ang kredensiyal sa encryption"
+  },
+  "drive_intro": {
+    "drive_title": "Nagiging drive ang Telegram account mo",
+    "drive_body": "Ang Saved Messages ang pangunahing imbakan mo. Direktang nagbabasa at nagsusulat ng file ang Telegram Drive sa pamamagitan ng Telegram session mo.",
+    "folders_title": "Mga pribadong channel ang mga folder",
+    "folders_body": "Ang paggawa ng folder ay lumilikha ng pribadong Telegram channel na pag-aari ng account mo. Ipinapakita ng app ang mga channel bilang pamilyar na drive.",
+    "protection_title": "Mag-imbak nang normal o protektahan muna",
+    "protection_body": "Maaaring normal na itago ang bawat upload o protektahan ito nang lokal bago makarating sa Telegram. Nananatiling mga tahasang pinipiling aksiyon ang pagbabahagi at WebDAV.",
+    "progress": "Pagsisimula · {{current}} sa {{total}}",
+    "skip": "Laktawan ang pagpapakilala sa drive",
+    "progress_label": "Pag-usad ng pagpapakilala",
+    "help": "Buksan ang tulong at FAQ"
+  },
+  "help_topics": {
+    "storage_question": "Saan nakaimbak ang mga file ko?",
+    "storage_answer": "Mga Telegram message ang mga file sa Saved Messages o pribadong channel na ginawa bilang folder. Walang hiwalay na cloud storage account na pinatatakbo ang Telegram Drive.",
+    "limits_question": "Ano ang mga praktikal na limitasyon?",
+    "limits_answer": "Limitado sa 2 GB ang isang Telegram object sa app na ito. Maaaring matagal ang pag-index ng napakalaking folder; ipinapakita ng live na bilang ng mensahe ang pag-usad ng sync.",
+    "protection_question": "Ano ang ginagawa ng I-imbak at protektahan?",
+    "protection_answer": "Lokal nitong ini-encrypt ang mga byte ng file bago i-upload. Ingatan ang vault passphrase at recovery bundle: hindi mababawi ng Telegram ang mga protektadong file para sa iyo.",
+    "sharing_question": "Paano gumagana ang pagbabahagi?",
+    "sharing_answer": "Pumili ng Telegram channel link, lokal na link na may password, o WebDAV/REST. Kailangang tahasang paganahin ang mga lokal na server at access URL.",
+    "guest_question": "Bakit walang laman ang folder sa Finder Guest?",
+    "guest_answer": "Ibinibigay ang WebDAV access ng token sa buong /dav/<token>/ URL. Walang access na saklaw ng token ang guest o anonymous login.",
+    "more": "Kailangan pa ng tulong?",
+    "support": "Buksan ang mga isyu sa suporta"
+  },
+  "shortcut_labels": {
+    "search": "Maghanap ng mga file",
+    "select_all": "Piliin ang lahat ng file",
+    "open": "Buksan ang napiling file",
+    "rename": "Palitan ang pangalan ng napiling file",
+    "download": "I-download ang napili",
+    "share": "Ibahagi ang napili",
+    "delete": "Burahin ang napili",
+    "close": "Isara ang aktibong dialog o alisin ang pagpili",
+    "show": "Ipakita ang gabay na ito sa shortcut"
+  },
+  "privacy_destinations": {
+    "device_title": "Device na ito",
+    "device_body": "Nananatiling lokal ang settings, estado ng pila, thumbnail, at naka-encrypt na vault material.",
+    "telegram_body": "Direktang pumupunta sa Telegram account mo ang mga folder channel at mensahe ng na-upload na file.",
+    "sponsors_title": "Mga sponsor",
+    "sponsors_body": "Sa mga may label na ad area lang naglo-load ang sponsor content. Hindi kailanman ipinapadala sa sponsor ang aktibidad ng file.",
+    "crash_title": "Mga ulat ng pag-crash",
+    "crash_body": "Pagkatapos lamang ng pahintulot: bersiyon ng app, platform, uri ng error, at mga pangalan ng function na nilinis."
+  },
+  "theme_names": {
+    "default_dark": "Default na madilim",
+    "charcoal": "Uling",
+    "cyber_teal": "Cyber na asul-berde",
+    "default_light": "Default na maliwanag",
+    "ocean": "Karagatan",
+    "forest": "Gubat",
+    "plum": "Lilang plum",
+    "paper": "Papel",
+    "rose": "Rosas",
+    "mint": "Luntiang mint",
+    "sky": "Langit"
+  },
+  "advanced_copy": {
+    "rest_description": "Lokal na automation endpoint at API key",
+    "webdav_description": "Access para sa Finder at file manager",
+    "proxy_description": "Mga setting ng SOCKS5 at HTTP bridge",
+    "vpn_title": "VPN at network",
+    "vpn_description": "Mga pag-ulit, bandwidth, at pag-aayos ng data center"
+  },
+  "settings_sync_copy": {
+    "replace_title": "Palitan ang backup ng settings?",
+    "replace_description": "Mula sa ibang device ang pinakabagong naka-encrypt na backup. Papalitan ito ng upload ng kasalukuyang ligtas na preferences ng device na ito.",
+    "replace": "Palitan ang backup",
+    "uploaded": "Na-upload ang naka-encrypt na settings sa Telegram Saved Messages.",
+    "apply_title": "Ilapat ang settings mula sa Telegram?",
+    "apply_description": "Papalitan ng naka-sync na display, transfer, network, at encryption preferences ang mga lokal na halaga. Hindi magbabago ang credentials at activation data.",
+    "apply": "Ilapat ang settings",
+    "downloaded": "Na-download at nailapat ang naka-encrypt na settings.",
+    "title": "Naka-encrypt na settings sync",
+    "description": "Manu-manong ilipat ang ligtas na app preferences sa pagitan ng mga device gamit ang sarili mong Telegram Saved Messages. Walang sync server na pinatatakbo ang Telegram Drive.",
+    "enable": "Paganahin ang naka-encrypt na settings sync",
+    "warning": "Hindi mababawi ang passphrase mo.",
+    "exclusions": "Lokal itong ginagamit at hindi kailanman itinatago o ina-upload. Maaaring makita ang naka-encrypt na Telegram message sa Saved Messages. Laging hindi kasama ang password, API/WebDAV key, proxy details, supporter activation, crash consent, at file data.",
+    "passphrase": "Passphrase para sa sync",
+    "placeholder": "Hindi bababa sa 12 karakter",
+    "upload": "I-upload mula sa device na ito",
+    "download": "I-download at ilapat",
+    "refresh": "I-refresh ang estado ng settings sync",
+    "latest": "Pinakabagong backup: {{date}} · {{device}}",
+    "this_device": "na-upload ng device na ito",
+    "other_device": "na-upload ng ibang device",
+    "none": "Walang naka-encrypt na settings backup sa pinakabagong 1,000 Saved Messages."
   }
 }

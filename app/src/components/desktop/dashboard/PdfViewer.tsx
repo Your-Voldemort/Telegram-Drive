@@ -72,7 +72,7 @@ export function PdfViewer({ file, onClose, onNext, onPrev, currentIndex, totalIt
         if (isAndroidPlatform || localPath) return;
         invoke<StreamInfo>('cmd_get_stream_info').then(setStreamInfo).catch((err) => {
             console.error("Failed to get stream info:", err);
-            setError("Failed to initialize stream");
+            setError(i18n.t('viewer.stream_failed'));
         });
     }, [localPath]);
 
@@ -98,7 +98,7 @@ export function PdfViewer({ file, onClose, onNext, onPrev, currentIndex, totalIt
 
         const loadStream = () => {
             if (!streamInfo || cancelled) {
-                if (!streamInfo) setError("Failed to initialize stream");
+                if (!streamInfo) setError(i18n.t('viewer.stream_failed'));
                 return;
             }
             const folderIdParam = activeFolderId !== null ? activeFolderId.toString() : 'home';
@@ -110,7 +110,7 @@ export function PdfViewer({ file, onClose, onNext, onPrev, currentIndex, totalIt
             activeLoadingTask.promise.then(finishPdfLoad, (err) => {
                 if (cancelled) return;
                 console.error("Error loading PDF stream:", err);
-                setError("Failed to load PDF document.");
+                setError(i18n.t('viewer.pdf_document_failed'));
                 setLoading(false);
             });
         };
@@ -141,7 +141,7 @@ export function PdfViewer({ file, onClose, onNext, onPrev, currentIndex, totalIt
                     })
                     .catch((externalError) => {
                         if (!cancelled) {
-                            setError("Failed to render PDF in WebView or open natively: " + String(externalError));
+                            setError(i18n.t('viewer.pdf_native_failed', { error: String(externalError) }));
                             setLoading(false);
                         }
                     });
@@ -169,7 +169,7 @@ export function PdfViewer({ file, onClose, onNext, onPrev, currentIndex, totalIt
                 if (filePath) loadLocalFile(filePath);
                 else if (!isAndroidPlatform) loadStream();
                 else {
-                    setError("Failed to fetch PDF preview path.");
+                    setError(i18n.t('viewer.pdf_path_failed'));
                     setLoading(false);
                 }
             }).catch((err) => {
@@ -179,7 +179,7 @@ export function PdfViewer({ file, onClose, onNext, onPrev, currentIndex, totalIt
                     loadStream();
                 } else {
                     console.error("Error invoking PDF preview command:", err);
-                    setError("Failed to load PDF.");
+                    setError(i18n.t('viewer.pdf_load_failed'));
                     setLoading(false);
                 }
             });

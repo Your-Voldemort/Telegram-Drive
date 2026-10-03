@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Translate authentication, encryption, desktop supporter recovery hints, onboarding, Help, shortcuts, privacy destinations and theme/settings arrays across all 24 catalogs. Finish copied-English translations in eleven large locales and ratchet only the two approved locale ceilings to the measured encoded sizes. Mobile follow-up changes remain local under the owner hook, and native language review remains required.
+
 - Display plain desktop HEIC/HEIF photos through separate, bounded JPEG renditions, including offline copies, gallery/slideshow and thumbnail fallback. Try macOS sips before user-installed FFmpeg 8.1+, preserve original-file actions, and show translated recovery text when no compatible decoder is available.
 
 - Restore external opening for exact, account-recorded plain preview, thumbnail and offline cache files made by 3.9.x. Lazy registration retains content hashing, account isolation and substitution checks; user-chosen download folders are excluded.
@@ -20,7 +22,7 @@
 - Ratchet measured bundle ceilings to 513,000 initial JavaScript bytes, 302,000 desktop-route bytes and 159,000 Settings-feature bytes. The current pass measures 504,751, 300,521 and 149,734 bytes respectively. Separate English/dictionary startup data is 84,352 bytes; locale totals remain fully counted.
 
 - Localize desktop tray, transfer notifications and share password pages across all 24 languages; retain account isolation, receipt deduplication, notification privacy and share authentication. Recheck notification/filename preferences immediately before delivery and preserve newer tray/receipt state during concurrent transitions.
-- Localize protection and local-access safety explanations and upload storage choice; preserve child-dialog and parent-dialog focus restoration. Remove additional verified-unused locale keys, consolidate byte-identical labels and lower literal/copied-English baselines. Remaining localization extraction awaits the catalog performance-budget review documented in `Docs/LOCALIZATION_BUDGET_REVIEW.md`; native language review remains outstanding.
+- Localize protection and local-access safety explanations and upload storage choice; preserve child-dialog and parent-dialog focus restoration. Remove additional verified-unused locale keys, consolidate byte-identical labels and lower literal/copied-English baselines. The approved locale-only expansion and remaining noncritical extraction are documented in `Docs/LOCALIZATION_BUDGET_REVIEW.md`; native language review remains outstanding.
 
 - Localize desktop tray menus and transfer notifications from the canonical catalogs, preserve read-only startup language preferences and synchronize native language after successful frontend loading. Prevent queued notifications from being stranded during aggregation handoff.
 

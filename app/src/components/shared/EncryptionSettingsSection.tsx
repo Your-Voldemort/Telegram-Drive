@@ -23,7 +23,7 @@ function RecoveryDrillPanel({ encryption, onComplete }: { encryption: ReturnType
         if (recoveryPassphrase.length < 8) return;
         setBusy(true);
         try {
-            await requireAndroidReauthentication('Authenticate before exporting vault recovery material');
+            await requireAndroidReauthentication(t('protection_labels.auth_export'));
             setBundle(await encryption.exportRecovery(recoveryPassphrase));
         } catch (error) {
             toast.error(t('recovery_copy.export_failed', { error: String(error) }));
@@ -36,7 +36,7 @@ function RecoveryDrillPanel({ encryption, onComplete }: { encryption: ReturnType
         if (!verifyBundle.trim() || !verifyPassphrase) return;
         setBusy(true);
         try {
-            await requireAndroidReauthentication('Authenticate before checking vault recovery material');
+            await requireAndroidReauthentication(t('protection_labels.auth_check'));
             // Verification only: the vault file, its passphrase and its keys
             // are left exactly as they are.
             const result = await encryption.verifyRecovery(verifyBundle.trim(), verifyPassphrase);
@@ -93,7 +93,7 @@ function ExportRecoverySection({ encryption }: { encryption: ReturnType<typeof u
         if (!exportPassphrase) return;
         setExporting(true);
         try {
-            await requireAndroidReauthentication('Authenticate before exporting vault recovery material');
+            await requireAndroidReauthentication(t('protection_labels.auth_export'));
             const bundle = await encryption.exportRecovery(exportPassphrase);
             setExportedBundle(bundle);
             toast.success(t('settings.export_success'));
@@ -195,7 +195,7 @@ function ImportRecoverySection({ encryption, vaultUnlocked }: { encryption: Retu
         if (!accepted) return;
         setImporting(true);
         try {
-            await requireAndroidReauthentication('Authenticate before importing vault recovery material');
+            await requireAndroidReauthentication(t('protection_labels.auth_import'));
             const options = { vaultPassphrase: needsVaultPassphrase ? vaultPassphrase : undefined };
             try {
                 await encryption.importRecovery(importBundle.trim(), importPassphrase, options);
@@ -375,7 +375,7 @@ export function EncryptionSettingsSection() {
         }
         setChangingVaultPassphrase(true);
         try {
-            await requireAndroidReauthentication('Authenticate before changing the vault passphrase');
+            await requireAndroidReauthentication(t('protection_labels.auth_change'));
             await encryption.changeVaultPassphrase(currentVaultPassphrase, newVaultPassphrase);
             setCurrentVaultPassphrase('');
             setNewVaultPassphrase('');
@@ -540,11 +540,7 @@ export function EncryptionSettingsSection() {
                             className="appearance-none bg-telegram-bg border border-telegram-border rounded-md pl-3 pr-8 py-1.5 text-sm text-telegram-text focus:outline-none focus:border-telegram-primary/50 transition cursor-pointer"
                         >
                             <option value={0}>{t('settings.never')}</option>
-                            <option value={1}>1 min</option>
-                            <option value={5}>5 min</option>
-                            <option value={15}>15 min</option>
-                            <option value={30}>30 min</option>
-                            <option value={60}>60 min</option>
+                            {[1, 5, 15, 30, 60].map(minutes => <option key={minutes} value={minutes}>{new Intl.NumberFormat(i18n.language, { style: 'unit', unit: 'minute', unitDisplay: 'short' }).format(minutes)}</option>)}
                         </select>
                         <ChevronDown className="w-4 h-4 text-telegram-subtext absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
