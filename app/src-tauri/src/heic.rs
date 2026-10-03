@@ -521,11 +521,36 @@ pub(crate) fn version_eligible(bytes: &[u8]) -> bool {
     else {
         return false;
     };
-    let mut parts = version.split('.');
-    let Some(major) = parts.next().and_then(|v| v.parse::<u32>().ok()) else {
+    // Release builds may use n8.1 or vendor suffixes. Unversioned N-… master
+    // banners cannot establish tile-grid support; never infer it from a date/hash.
+    let version = version.strip_prefix('n').unwrap_or(version);
+    let Some((major, rest)) = version.split_once('.') else {
         return false;
     };
-    let Some(minor) = parts.next().and_then(|v| v.parse::<u32>().ok()) else {
+    if major.is_empty() || !major.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    let minor_end = rest
+        .bytes()
+        .position(|byte| !byte.is_ascii_digit())
+        .unwrap_or(rest.len());
+    let suffix = &rest[minor_end..];
+    let suffix = if let Some(patch) = suffix.strip_prefix('.') {
+        let patch_end = patch
+            .bytes()
+            .position(|byte| !byte.is_ascii_digit())
+            .unwrap_or(patch.len());
+        if patch_end == 0 {
+            return false;
+        }
+        &patch[patch_end..]
+    } else {
+        suffix
+    };
+    if !suffix.is_empty() && !suffix.starts_with('-') && !suffix.starts_with('+') {
+        return false;
+    }
+    let (Ok(major), Ok(minor)) = (major.parse::<u32>(), rest[..minor_end].parse::<u32>()) else {
         return false;
     };
     major > 8 || (major == 8 && minor >= 1)

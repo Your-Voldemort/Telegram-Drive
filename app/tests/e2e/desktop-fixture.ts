@@ -120,6 +120,8 @@ export async function desktopFixture(page: Page, options: {
           if (command === 'cmd_auth_request_code') return { status: 'code_required', delivery: 'telegram_app', codeLength: 5, numericCode: true };
           if (command === 'cmd_auth_sign_in') return { success: false, next_step: 'password' };
           if (command === 'cmd_auth_check_password') {
+            // Counterfactual response to exercise the defensive UI; current native code never returns false.
+            if (args.password === 'unsupported-false-response-fixture') return { success: false };
             // Same message the native command returns for a rejected password.
             if (args.password === 'incorrect-fixture-password') throw new Error('That two-step verification password is incorrect. Check it and try again.');
             return { success: true };

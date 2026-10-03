@@ -78,14 +78,14 @@ fn heic_helper() -> Result<(), String> {
     let mode = std::fs::read_to_string(root.join("heic-mode")).unwrap_or_else(|_| "success".into());
     let args: Vec<_> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("-version") {
-        println!(
-            "ffmpeg version {}",
+        let version = std::fs::read_to_string(root.join("heic-version")).unwrap_or_else(|_| {
             if mode.trim() == "old" {
-                "8.0.1"
+                "8.0.1".into()
             } else {
-                "8.1.2"
+                "8.1.2".into()
             }
-        );
+        });
+        println!("ffmpeg version {}", version.trim());
         return Ok(());
     }
     std::fs::write(root.join("heic-pid"), std::process::id().to_string())

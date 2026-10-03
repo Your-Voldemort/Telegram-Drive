@@ -7748,6 +7748,53 @@ fn wait_heic_process(fixture: &Fixture) {
     }
 }
 #[test]
+fn heic_version_banners_gate_the_real_asset_pipeline_and_keep_original_actions() {
+    let mut failures = Vec::new();
+    for (version, eligible) in [
+        ("8.1.2", true),
+        ("8.1-full_build-www.gyan.dev", true),
+        ("n8.1-3-g0123abcd", true),
+        ("9.0", true),
+        ("8.0.1", false),
+        ("7.1.1-1ubuntu1", false),
+        ("N-121234-g0123abcd-20260901", false),
+        ("8.1foo", false),
+    ] {
+        let (fixture, mut app) = heic_fixture();
+        fixture.write("heic-version", version);
+        let reply = app.request(heic_request());
+        if reply["ok"] != eligible {
+            failures.push(format!(
+                "{version}: expected eligible={eligible}, got {reply}"
+            ));
+        }
+        if reply["ok"] == true {
+            assert_eq!(
+                image::image_dimensions(reply["value"]["path"].as_str().unwrap()).unwrap(),
+                (240, 180)
+            );
+            assert!(fixture.path("heic-pid").is_file());
+        } else {
+            assert!(reply["error"]
+                .as_str()
+                .unwrap()
+                .contains("HEIC_FFMPEG_VERSION_UNSUPPORTED"));
+            assert!(
+                !fixture.path("heic-pid").exists(),
+                "Refused version must not decode"
+            );
+        }
+        let original = app.ok(json!({"command":"asset_cached","owner":"101"}));
+        app.ok(json!({"command":"external_file_open","path":Path::new(original.as_str().unwrap()).strip_prefix(fixture.0.canonicalize().unwrap()).unwrap().to_string_lossy()}));
+        assert_eq!(
+            std::fs::read(original.as_str().unwrap()).unwrap(),
+            include_bytes!("../test-support/fixtures/heic/small.heic")
+        );
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
 fn heic_rejects_corrupt_oversized_old_missing_and_partial_tile_decoders() {
     for mode in [
         "corrupt",
