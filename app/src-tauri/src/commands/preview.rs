@@ -35,11 +35,9 @@ pub fn legacy_preview_mutation() -> std::sync::MutexGuard<'static, LegacyPreview
         .lock()
         .unwrap_or_else(|e| e.into_inner())
 }
-#[cfg(feature = "native-e2e")]
-struct LegacyPreviewWrite(PathBuf);
-#[cfg(feature = "native-e2e")]
-impl LegacyPreviewWrite {
-    fn new(path: &Path) -> Self {
+pub(crate) struct LegacyPreviewUse(PathBuf);
+impl LegacyPreviewUse {
+    pub(crate) fn new(path: &Path) -> Self {
         *legacy_preview_mutation()
             .active
             .entry(path.into())
@@ -47,8 +45,7 @@ impl LegacyPreviewWrite {
         Self(path.into())
     }
 }
-#[cfg(feature = "native-e2e")]
-impl Drop for LegacyPreviewWrite {
+impl Drop for LegacyPreviewUse {
     fn drop(&mut self) {
         let mut state = legacy_preview_mutation();
         if let Some(count) = state.active.get_mut(&self.0) {
@@ -393,8 +390,8 @@ pub(crate) async fn create_resized_thumbnail(
     account: Option<AccountGuard>,
 ) -> Result<PathBuf, String> {
     let holds = (
-        LegacyPreviewWrite::new(&source_path),
-        LegacyPreviewWrite::new(&destination_path),
+        LegacyPreviewUse::new(&source_path),
+        LegacyPreviewUse::new(&destination_path),
     );
     crate::workspace::assets::render_thumbnail(
         source_path,

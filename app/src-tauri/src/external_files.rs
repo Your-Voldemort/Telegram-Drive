@@ -98,7 +98,16 @@ fn digest(path: &Path) -> Result<String, String> {
 }
 /// Call only after successful production/publication and existing protection checks.
 pub(crate) fn register(account: &AccountGuard, path: &Path) -> Result<(), String> {
+    register_checked(account, path, || Ok(()), false)
+}
+fn register_checked(
+    account: &AccountGuard,
+    path: &Path,
+    check: impl Fn() -> Result<(), String>,
+    legacy: bool,
+) -> Result<(), String> {
     account.validate()?;
+    check()?;
     let (absolute, canonical, identity) = location(path)?;
     let store = Store::open(&account.root, account.owner)?;
     let record_key = key(&absolute);
@@ -114,16 +123,22 @@ pub(crate) fn register(account: &AccountGuard, path: &Path) -> Result<(), String
         return Err("FILE_OPEN_REFUSED: File changed during registration".into());
     }
     account.validate()?;
-    store.put_record(
-        "external-produced-v1",
-        &record_key,
-        &ProducedFile {
-            canonical,
-            identity,
-            digest,
-        },
-    )?;
-    account.validate()
+    store.transaction(|| {
+        check()?;
+        store.put_record(
+            "external-produced-v1",
+            &record_key,
+            &ProducedFile {
+                canonical,
+                identity,
+                digest,
+            },
+        )?;
+        if legacy {
+            store.put_record("external-cache-migration-v1", &record_key, &true)?;
+        }
+        account.validate()
+    })
 }
 fn validate_lease(account: &AccountGuard, path: &Path) -> Result<ValidatedFile, String> {
     account.validate()?;
@@ -184,6 +199,68 @@ impl ValidatedFile {
         Ok(self.path)
     }
 }
+static MIGRATIONS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<PathBuf, std::sync::Weak<std::sync::Mutex<()>>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+fn migration_lock(path: &Path) -> std::sync::Arc<std::sync::Mutex<()>> {
+    let mut locks = MIGRATIONS.lock().unwrap_or_else(|e| e.into_inner());
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = locks.get(path).and_then(std::sync::Weak::upgrade) {
+        return lock;
+    }
+    let lock = std::sync::Arc::new(std::sync::Mutex::new(()));
+    locks.insert(path.to_path_buf(), std::sync::Arc::downgrade(&lock));
+    lock
+}
+/// Only the missing-registration path can lazily adopt a recorded private cache.
+pub(crate) async fn open_async(
+    account: AccountGuard,
+    cache: PathBuf,
+    path: PathBuf,
+) -> Result<ValidatedFile, String> {
+    blocking(move || {
+        let (absolute, _, _) = location(&path)?;
+        let record_key = key(&absolute);
+        let store = Store::open(&account.root, account.owner)?;
+        if store
+            .record::<ProducedFile>("external-produced-v1", &record_key)?
+            .is_none()
+        {
+            let lock = migration_lock(&absolute);
+            let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+            if store
+                .record::<ProducedFile>("external-produced-v1", &record_key)?
+                .is_none()
+            {
+                if store
+                    .record::<bool>("external-cache-migration-v1", &record_key)?
+                    .is_some()
+                {
+                    return Err(
+                        "FILE_OPEN_REFUSED: Previously migrated registration is missing".into(),
+                    );
+                }
+                let proof = crate::legacy_external::identify(&account, &cache, &absolute)?
+                    .ok_or("FILE_OPEN_REFUSED: File has no eligible private cache record")?;
+                register_checked(
+                    &account,
+                    &absolute,
+                    || {
+                        if proof.check(&account, &cache, &absolute)? {
+                            Ok(())
+                        } else {
+                            Err("FILE_OPEN_REFUSED: Legacy cache record changed".into())
+                        }
+                    },
+                    true,
+                )?;
+            }
+        }
+        validate_lease(&account, &absolute)
+    })
+    .await
+}
+
 pub(crate) async fn validate_async(
     account: AccountGuard,
     path: PathBuf,
@@ -194,7 +271,16 @@ pub(crate) async fn validate_async(
 /// Reuse only a previously verified produced file. Older unregistered cache
 /// entries remain available internally but gain no external-opening permission.
 pub(crate) async fn reuse_cached(account: AccountGuard, path: PathBuf) -> Result<bool, String> {
+    reuse_cached_retained(account, path, ()).await
+}
+/// Detached blocking work owns its cache admission until all writes finish.
+pub(crate) async fn reuse_cached_retained(
+    account: AccountGuard,
+    path: PathBuf,
+    lease: impl Send + 'static,
+) -> Result<bool, String> {
     blocking(move || {
+        let _lease = lease;
         let (absolute, _, _) = location(&path)?;
         if Store::open(&account.root, account.owner)?
             .record::<ProducedFile>("external-produced-v1", &key(&absolute))?

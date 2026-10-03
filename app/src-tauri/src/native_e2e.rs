@@ -1070,6 +1070,11 @@ impl Driver {
             | "asset_clear_all"
             | "asset_status"
             | "asset_offline_seed"
+            | "legacy_external_seed"
+            | "legacy_external_resolve"
+            | "legacy_external_resolve_start"
+            | "legacy_external_clear_start"
+            | "legacy_external_status"
             | "asset_offline_read"
             | "asset_metadata_finished"
             | "asset_metadata_started"
@@ -1643,7 +1648,12 @@ impl Driver {
                 let release = child(&self.root, &format!("file-{id}.release"))?;
                 let post_hash = request["postHash"].as_bool().unwrap_or(false);
                 let reuse_cache = request["reuseCache"].as_bool().unwrap_or(false);
-                if post_hash {
+                let hold = request["hold"].as_bool().unwrap_or(true);
+                let legacy = request["legacy"].as_bool().unwrap_or(false);
+                let cache = self.root.join("asset-cache");
+                if !hold {
+                    // Start a second real worker without installing another global gate.
+                } else if post_hash {
                     crate::external_files::test_hold_validated(started.clone(), release);
                 } else {
                     crate::external_files::test_hold(started.clone(), release);
@@ -1656,8 +1666,11 @@ impl Driver {
                                 .await
                                 .map(|value| json!(value));
                         }
-                        let file =
-                            crate::external_files::validate_async(account.clone(), path).await?;
+                        let file = if legacy {
+                            crate::external_files::open_async(account.clone(), cache, path).await?
+                        } else {
+                            crate::external_files::validate_async(account.clone(), path).await?
+                        };
                         if post_hash {
                             file.checked(&account)?;
                         }
@@ -1665,7 +1678,7 @@ impl Driver {
                     }),
                 );
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-                while !started.is_file() {
+                while hold && !started.is_file() {
                     if tokio::time::Instant::now() >= deadline {
                         return Err("File worker did not start".into());
                     }
@@ -1675,8 +1688,9 @@ impl Driver {
             }
             "external_file_open" => {
                 let account = AccountGuard::open(&self.root, None)?;
-                let path = crate::external_files::validate_async(
+                let path = crate::external_files::open_async(
                     account.clone(),
+                    self.root.join("asset-cache"),
                     produced_fixture_path(&self.root, text(&request, "path")?)?,
                 )
                 .await?
@@ -2472,6 +2486,175 @@ impl Driver {
                 .await?,
             )
             .map_err(error),
+            "legacy_external_status" => {
+                let account = AccountGuard::open(&self.root, None)?;
+                let values = Store::open(&account.root, account.owner)?
+                    .records::<Value>("external-cache-migration-v1")?;
+                Ok(json!({"migrated": values.len()}))
+            }
+            "legacy_external_resolve_start" => {
+                let account = AccountGuard::open(&self.root, None)?;
+                let id = text(&request, "task")?.to_string();
+                let cache = self.root.join("asset-cache");
+                let started = self.root.join(format!("file-{id}.started"));
+                crate::external_files::test_hold(
+                    started.clone(),
+                    self.root.join(format!("file-{id}.release")),
+                );
+                self.vault_tasks.insert(
+                    id,
+                    tokio::spawn(async move {
+                        crate::workspace::assets::legacy_asset_at(
+                            cache,
+                            account,
+                            "saved:1".into(),
+                            false,
+                            || async {
+                                Err("NETWORK_UNAVAILABLE: Telegram fixture is offline".into())
+                            },
+                        )
+                        .await
+                        .map(|path| json!(path))
+                    }),
+                );
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+                while !started.is_file() {
+                    if tokio::time::Instant::now() >= deadline {
+                        return Err("Legacy hash did not start".into());
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                Ok(json!(true))
+            }
+            "legacy_external_clear_start" => {
+                let account = AccountGuard::open(&self.root, None)?;
+                let id = text(&request, "task")?.to_string();
+                let root = self.root.clone();
+                let started = root.join("legacy-clear.started");
+                let signal = started.clone();
+                self.vault_tasks.insert(
+                    id,
+                    tokio::spawn(async move {
+                        std::fs::write(signal, b"ready").map_err(error)?;
+                        let cache = root.join("asset-cache");
+                        crate::workspace::assets::clear_at(&cache, account.owner, "previews")
+                            .await?;
+                        crate::workspace::storage::clear_legacy_previews(&cache)?;
+                        std::fs::write(root.join("legacy-clear.done"), b"done").map_err(error)?;
+                        Ok(json!(true))
+                    }),
+                );
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+                while !started.is_file() {
+                    if tokio::time::Instant::now() >= deadline {
+                        return Err("Legacy clear did not start".into());
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                Ok(json!(true))
+            }
+            "legacy_external_resolve" => {
+                let account = AccountGuard::open(&self.root, None)?;
+                let key =
+                    crate::workspace::store::file_key(None, request["id"].as_i64().unwrap_or(1));
+                crate::workspace::assets::legacy_asset_at(
+                    self.root.join("asset-cache"),
+                    account,
+                    key,
+                    request["thumbnail"].as_bool().unwrap_or(false),
+                    || async { Err("NETWORK_UNAVAILABLE: Telegram fixture is offline".into()) },
+                )
+                .await
+                .map(|path| json!(path))
+            }
+            "legacy_external_seed" => {
+                use sha2::{Digest, Sha256};
+                let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
+                let source = child(&self.root, text(&request, "source")?)?;
+                let size = std::fs::metadata(&source).map_err(error)?.len();
+                let id = request["id"].as_i64().unwrap_or(1);
+                let file = crate::workspace::store::WorkspaceFile {
+                    key: crate::workspace::store::file_key(None, id),
+                    folder_name: "Historical fixture".into(),
+                    tags: Vec::new(),
+                    collection_ids: Vec::new(),
+                    file: crate::models::FileMetadata {
+                        id,
+                        folder_id: None,
+                        name: "fixture.png".into(),
+                        size,
+                        mime_type: Some("image/png".into()),
+                        file_ext: Some("png".into()),
+                        created_at: "2026-10-01T00:00:00Z".into(),
+                        icon_type: "file".into(),
+                        encryption_state: request["protection"].as_str().unwrap_or("plain").into(),
+                        is_favorite: false,
+                        is_pinned: false,
+                    },
+                };
+                let store = Store::open(&account.root, account.owner)?;
+                store.remember_local_file(&file.file)?;
+                store.put_record(
+                    "opened",
+                    &file.key,
+                    &json!({"folder_id":null,"message_id":id,"last_opened_at":100,"open_count":1}),
+                )?;
+                if request["removeMetadata"] == true {
+                    store.complete_scan(None, "missing-current-inventory")?;
+                }
+                if request["updateOnly"] == true {
+                    return Ok(json!(true));
+                }
+                let category = request["category"].as_str().unwrap_or("previews");
+                let pack_id = uuid::Uuid::new_v4().to_string();
+                let directory = if category == "flat-preview" {
+                    self.root.join("asset-cache/previews")
+                } else if category == "flat-thumbnail" {
+                    self.root.join("thumbnails")
+                } else if category == "offline" {
+                    let pack = json!({"id": pack_id, "ownerId": account.owner.to_string(), "status":"ready",
+                        "files":[{"file":file,"status":"ready","downloadedBytes":size}], "expiresAt":null});
+                    store.put_record("offline-pack", &pack_id, &pack)?;
+                    self.root
+                        .join("workspace")
+                        .join(account.owner.to_string())
+                        .join("offline")
+                        .join(&pack_id)
+                } else {
+                    if !["previews", "thumbnails"].contains(&category) {
+                        return Err("Invalid fixture category".into());
+                    }
+                    self.root
+                        .join("asset-cache/previews/workspace")
+                        .join(account.owner.to_string())
+                        .join(category)
+                };
+                std::fs::create_dir_all(&directory).map_err(error)?;
+                let mut key = file.key.clone();
+                if request["current"] == true {
+                    let identity = "recorded-current-fixture";
+                    store.put_record("asset-identity-v1", &key, &identity)?;
+                    key = format!("raster-v2:{key}:{identity}:{}", category == "thumbnails");
+                }
+                let name = if category == "flat-preview" {
+                    format!("{}_home_{id}.png", account.owner)
+                } else if category == "flat-thumbnail" {
+                    format!("{}_home_{id}.thumb.jpg", account.owner)
+                } else if category == "thumbnails" {
+                    format!("{:x}.jpg", Sha256::digest(key.as_bytes()))
+                } else {
+                    let mut named = file.clone();
+                    named.key = key;
+                    crate::workspace::assets::file_name(&named)
+                };
+                let target = directory.join(name);
+                std::fs::hard_link(source, &target).map_err(error)?;
+                let canonical = target.canonicalize().map_err(error)?;
+                let relative = canonical
+                    .strip_prefix(self.root.canonicalize().map_err(error)?)
+                    .map_err(error)?;
+                Ok(json!({"path":relative.to_string_lossy(),"pack":pack_id}))
+            }
             "asset_offline_seed" => {
                 let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
                 let (file, _) =

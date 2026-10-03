@@ -86,15 +86,21 @@ impl Backend {
         instance
     }
     fn request(&mut self, request: Value) -> Value {
+        self.request_before(request, Duration::from_secs(60))
+    }
+    fn request_before(&mut self, request: Value, deadline: Duration) -> Value {
         writeln!(self.input, "{request}").unwrap();
         self.input.flush().unwrap();
-        self.replies
-            .recv_timeout(Duration::from_secs(60))
-            .expect("native process did not answer within 60s")
+        self.replies.recv_timeout(deadline).unwrap_or_else(|error| {
+            panic!("native process did not answer within {deadline:?}: {error}")
+        })
     }
     fn ok(&mut self, request: Value) -> Value {
+        self.ok_before(request, Duration::from_secs(60))
+    }
+    fn ok_before(&mut self, request: Value, deadline: Duration) -> Value {
         let command = request["command"].as_str().unwrap_or("unknown").to_string();
-        let reply = self.request(request);
+        let reply = self.request_before(request, deadline);
         assert_eq!(reply["ok"], true, "command={command}; reply={reply}");
         reply["value"].clone()
     }
@@ -6696,7 +6702,14 @@ fn release_maximum_retained_audit_set_rechecks_every_id_within_one_hour() {
     fixture.write("bound-small.json", json!({"highwater":100,"rows":(1..=100).map(|id|json!({"id":id,"name":format!("Small {id}")})).collect::<Vec<_>>()} ).to_string());
     let mut app = Backend::start(&fixture.0);
     app.ok(json!({"command":"seed_account","owner":101}));
-    let result = app.ok(json!({"command":"inventory_detection_bound","owner":"101","large":"bound-large.json","small":"bound-small.json"}));
+    // One IPC request compresses 92 virtual minutes over 100,000 rows.
+    // An isolated observation took 53.6s; 120s leaves headroom under four
+    // test threads without changing production timeouts or audit assertions.
+    const COMPRESSED_AUDIT_DEADLINE: Duration = Duration::from_secs(120);
+    let result = app.ok_before(
+        json!({"command":"inventory_detection_bound","owner":"101","large":"bound-large.json","small":"bound-small.json"}),
+        COMPRESSED_AUDIT_DEADLINE,
+    );
     println!("maximum retained audit detection: {result}");
     assert_eq!(result["seen"], 100000);
     assert!(result["repeated"].as_u64().unwrap() >= 100000);
@@ -7365,4 +7378,300 @@ fn release_external_post_hash_cache_replacement_cannot_inherit_registration() {
         b"unauthenticated substituted file"
     );
     app.failure(json!({"command":"external_file_open","path":"download.bin"}));
+}
+
+#[test]
+fn legacy_external_upgrade_records_restore_previews_thumbnails_and_offline_opening() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"historical app cache contents");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let mut paths = Vec::new();
+    for (id, category, current) in [
+        (1, "previews", false),
+        (2, "thumbnails", false),
+        (3, "offline", false),
+        (4, "previews", true),
+    ] {
+        let record = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","id":id,"category":category,"current":current}));
+        paths.push(record["path"].as_str().unwrap().to_string());
+    }
+    drop(app);
+    let mut app = Backend::start(&fixture.0);
+    for path in &paths {
+        app.ok(json!({"command":"external_file_open","path":path}));
+        assert_eq!(
+            fixture.read("opened-path"),
+            fixture
+                .path(path)
+                .canonicalize()
+                .unwrap()
+                .to_string_lossy()
+                .as_bytes()
+        );
+    }
+    assert_eq!(
+        app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+        4
+    );
+    drop(app);
+    let mut app = Backend::start(&fixture.0);
+    for path in &paths {
+        app.ok(json!({"command":"external_file_open","path":path}));
+    }
+    assert_eq!(
+        app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+        4
+    );
+}
+
+#[test]
+fn legacy_external_migration_refuses_unrecorded_siblings_symlinks_protected_and_other_accounts() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"known historical cache");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let known =
+        app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin"}));
+    let path = known["path"].as_str().unwrap();
+    let planted = fixture.path(path).with_extension("pdf");
+    std::fs::write(&planted, b"planted sibling").unwrap();
+    let relative = planted.strip_prefix(&fixture.0).unwrap().to_string_lossy();
+    app.failure(json!({"command":"external_file_open","path":relative}));
+    fixture.write("download.bin", b"user chosen download");
+    app.failure(json!({"command":"external_file_open","path":"download.bin"}));
+    let protected = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","id":2,"protection":"vault"}));
+    app.failure(json!({"command":"external_file_open","path":protected["path"]}));
+    #[cfg(unix)]
+    {
+        std::fs::remove_file(fixture.path(path)).unwrap();
+        std::os::unix::fs::symlink(fixture.path("legacy.bin"), fixture.path(path)).unwrap();
+        app.failure(json!({"command":"external_file_open","path":path}));
+        std::fs::remove_file(fixture.path(path)).unwrap();
+        std::fs::hard_link(fixture.path("legacy.bin"), fixture.path(path)).unwrap();
+    }
+    app.ok(json!({"command":"external_file_open","path":path}));
+    std::fs::write(fixture.path(path), b"modified same length!!").unwrap();
+    app.failure(json!({"command":"external_file_open","path":path}));
+    app.ok(json!({"command":"seed_account","owner":202}));
+    app.failure(json!({"command":"external_file_open","path":path}));
+}
+
+#[test]
+fn legacy_external_upgrade_keeps_historical_previews_discoverable_offline() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"historical offline preview");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","id":9}));
+    drop(app);
+    let mut app = Backend::start(&fixture.0);
+    let files = app.ok(json!({"command":"asset_offline_read","owner":"101"}));
+    assert_eq!(files.as_array().unwrap().len(), 1);
+    assert_eq!(files[0]["id"], 9);
+}
+
+#[test]
+fn legacy_external_upgrade_restores_flat_desktop_command_caches() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"recorded desktop cache");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let preview = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","id":51,"category":"flat-preview"}));
+    let thumb = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","id":52,"category":"flat-thumbnail"}));
+    drop(app);
+    let mut app = Backend::start(&fixture.0);
+    for path in [&preview["path"], &thumb["path"]] {
+        app.ok(json!({"command":"external_file_open","path":path}));
+    }
+    fixture.write(
+        "asset-cache/previews/101_home_51.pdf",
+        b"recorded desktop cache",
+    );
+    fixture.write(
+        "asset-cache/previews/101_home_999.png",
+        b"recorded desktop cache",
+    );
+    for path in [
+        "asset-cache/previews/101_home_51.pdf",
+        "asset-cache/previews/101_home_999.png",
+    ] {
+        app.failure(json!({"command":"external_file_open","path":path}));
+    }
+    assert_eq!(
+        app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+        2
+    );
+}
+
+#[test]
+fn legacy_external_concurrent_first_opens_register_once_and_never_remigrate() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"concurrent recorded cache");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let record =
+        app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin"}));
+    let path = &record["path"];
+    app.ok(json!({"command":"external_file_start","id":"first","path":path,"legacy":true}));
+    app.ok(json!({"command":"external_file_start","id":"second","path":path,"legacy":true,"hold":false}));
+    fixture.write("file-first.release", b"go");
+    for id in ["first", "second"] {
+        app.ok(json!({"command":"vault_prepare_finish","id":id}));
+    }
+    assert_eq!(
+        app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+        1
+    );
+    assert_eq!(
+        app.ok(json!({"command":"external_file_status"}))[1],
+        3 * b"concurrent recorded cache".len()
+    );
+    app.ok(json!({"command":"external_file_forget","path":path}));
+    app.failure(json!({"command":"external_file_open","path":path}));
+}
+
+#[test]
+fn legacy_external_hashing_rechecks_protection_and_account_before_registration() {
+    for change in ["protection", "account"] {
+        let fixture = Fixture::new();
+        fixture.write("legacy.bin", b"recorded cache pending migration");
+        let mut app = Backend::start(&fixture.0);
+        app.ok(json!({"command":"seed_account","owner":101}));
+        let record =
+            app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin"}));
+        app.ok(json!({"command":"external_file_start","id":"held","path":record["path"],"legacy":true}));
+        if change == "protection" {
+            app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","updateOnly":true,"protection":"vault"}));
+        } else {
+            app.ok(json!({"command":"seed_account","owner":202}));
+        }
+        fixture.write("file-held.release", b"go");
+        app.failure(json!({"command":"vault_prepare_finish","id":"held"}));
+        app.ok(json!({"command":"seed_account","owner":101}));
+        assert_eq!(
+            app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+            0
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn legacy_external_refuses_symlink_cache_directories() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"recorded cache");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let record =
+        app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin"}));
+    let path = record["path"].as_str().unwrap();
+    let parent = fixture.path(path).parent().unwrap().to_path_buf();
+    let moved = fixture.path("redirected");
+    std::fs::rename(&parent, &moved).unwrap();
+    std::os::unix::fs::symlink(&moved, &parent).unwrap();
+    app.failure(json!({"command":"external_file_open","path":path}));
+    assert_eq!(
+        app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+        0
+    );
+}
+
+#[test]
+fn legacy_external_command_resolves_and_opens_recorded_cache_without_telegram() {
+    for category in ["previews", "flat-preview", "thumbnails", "flat-thumbnail"] {
+        let fixture = Fixture::new();
+        fixture.write("legacy.bin", b"recorded cache without network");
+        let mut app = Backend::start(&fixture.0);
+        app.ok(json!({"command":"seed_account","owner":101}));
+        let file = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","category":category}));
+        drop(app);
+        let mut app = Backend::start(&fixture.0);
+        let resolved = app.ok(
+            json!({"command":"legacy_external_resolve","thumbnail":category.contains("thumbnail")}),
+        );
+        assert_eq!(
+            PathBuf::from(resolved.as_str().unwrap()),
+            fixture
+                .path(file["path"].as_str().unwrap())
+                .canonicalize()
+                .unwrap()
+        );
+        app.ok(json!({"command":"external_file_open","path":file["path"]}));
+        assert_eq!(
+            app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+            1
+        );
+    }
+}
+
+#[test]
+fn legacy_external_stale_plain_offline_pack_cannot_override_current_protection_or_removal() {
+    for change in ["protection", "removal"] {
+        let fixture = Fixture::new();
+        fixture.write("legacy.bin", b"ready plain offline pack");
+        let mut app = Backend::start(&fixture.0);
+        app.ok(json!({"command":"seed_account","owner":101}));
+        let file = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","category":"offline"}));
+        if change == "protection" {
+            app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","updateOnly":true,"protection":"vault"}));
+        } else {
+            app.ok(json!({"command":"workspace_seed_files","owner":"101","files":[],"hidden":["saved:1"]}));
+        }
+        assert!(app
+            .failure(json!({"command":"external_file_open","path":file["path"]}))
+            .contains("FILE_OPEN_REFUSED"));
+        assert_eq!(
+            app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+            0
+        );
+    }
+}
+
+#[test]
+fn legacy_external_ready_pack_survives_missing_current_inventory() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"ready pack absent from inventory");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let file = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","category":"offline","removeMetadata":true}));
+    app.ok(json!({"command":"external_file_open","path":file["path"]}));
+    assert_eq!(
+        app.ok(json!({"command":"legacy_external_status"}))["migrated"],
+        1
+    );
+}
+
+#[test]
+fn legacy_external_aborted_preview_hash_retains_cache_guards_until_clear_can_finish() {
+    for category in ["previews", "flat-preview"] {
+        let fixture = Fixture::new();
+        fixture.write("legacy.bin", b"legacy cache with held digest");
+        let mut app = Backend::start(&fixture.0);
+        app.ok(json!({"command":"seed_account","owner":101}));
+        let file = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","category":category}));
+        let path = file["path"].as_str().unwrap();
+        app.ok(json!({"command":"external_file_open","path":path}));
+        app.ok(json!({"command":"legacy_external_resolve_start","task":"resolve"}));
+        app.ok(json!({"command":"vault_prepare_abort","id":"resolve"}));
+        app.ok(json!({"command":"legacy_external_clear_start","task":"clear"}));
+        std::thread::sleep(Duration::from_millis(150));
+        assert!(
+            !fixture.path("legacy-clear.done").exists(),
+            "Clear must retain the detached hashing worker's cache lifetime"
+        );
+        assert!(fixture.path(path).is_file());
+        fixture.write("file-resolve.release", b"release");
+        app.ok(json!({"command":"vault_prepare_finish","id":"clear"}));
+        assert!(!fixture.path(path).exists());
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while app.ok(json!({"command":"external_file_status"}))[0] != 2 {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            !fixture.path(path).exists(),
+            "No worker may recreate cleared cache bytes"
+        );
+    }
 }

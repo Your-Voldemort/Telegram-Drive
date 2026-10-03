@@ -794,7 +794,7 @@ impl AssetSource for TelegramAssetSource {
         })
     }
 }
-fn disposable_name(file: &WorkspaceFile, identity: &str, thumbnail: bool) -> String {
+pub(crate) fn disposable_name(file: &WorkspaceFile, identity: &str, thumbnail: bool) -> String {
     let mut disposable = file.clone();
     disposable.key = format!("raster-v2:{}:{identity}:{thumbnail}", file.key);
     if thumbnail {
@@ -924,7 +924,7 @@ pub(crate) async fn legacy_asset(
     let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?;
     let lookup_key = key.clone();
     let scope = account.clone();
-    asset_at(cache, account, key, thumbnail, None, move || async move {
+    legacy_asset_at(cache, account, key, thumbnail, move || async move {
         let account = scope;
         let key = lookup_key;
         match lookup_file_at(&account, &key).await? {
@@ -936,6 +936,22 @@ pub(crate) async fn legacy_asset(
     })
     .await
 }
+/// Shared command path, with the Telegram lookup supplied by the caller.
+pub(crate) async fn legacy_asset_at<F, Fut>(
+    cache: PathBuf,
+    account: AccountGuard,
+    key: String,
+    thumbnail: bool,
+    resolve: F,
+) -> Result<String, String>
+where
+    F: FnOnce() -> Fut,
+    Fut:
+        std::future::Future<Output = Result<(WorkspaceFile, Option<Box<dyn AssetSource>>), String>>,
+{
+    asset_at_inner(cache, account, key, thumbnail, None, true, resolve).await
+}
+
 async fn resolve_unindexed(
     app: tauri::AppHandle,
     account: AccountGuard,
@@ -1157,6 +1173,23 @@ where
     Fut:
         std::future::Future<Output = Result<(WorkspaceFile, Option<Box<dyn AssetSource>>), String>>,
 {
+    asset_at_inner(cache, account, key, thumbnail, request_id, false, resolve).await
+}
+
+pub(crate) async fn asset_at_inner<F, Fut>(
+    cache: PathBuf,
+    account: AccountGuard,
+    key: String,
+    thumbnail: bool,
+    request_id: Option<String>,
+    historical: bool,
+    resolve: F,
+) -> Result<String, String>
+where
+    F: FnOnce() -> Fut,
+    Fut:
+        std::future::Future<Output = Result<(WorkspaceFile, Option<Box<dyn AssetSource>>), String>>,
+{
     account.validate()?;
     std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
     let cache = cache.canonicalize().map_err(|e| e.to_string())?;
@@ -1190,6 +1223,47 @@ where
         &["previews", "workspace", &owner_id, category],
         true,
     )?;
+    if historical {
+        let scope = account.clone();
+        let base = cache.clone();
+        let record_key = key.clone();
+        let legacy = tokio::task::spawn_blocking(move || {
+            crate::legacy_external::historical_asset(&scope, &base, &record_key, thumbnail)
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        if let Some((path, proof)) = legacy {
+            // Retain admission/category guards through the full digest. Clear
+            // invalidates the request before it waits for the same category.
+            let legacy = Arc::new(crate::commands::preview::LegacyPreviewUse::new(&path));
+            let lease = (
+                capacity.clone(),
+                file_guard.clone(),
+                category_guard.clone(),
+                legacy.clone(),
+            );
+            crate::external_files::reuse_cached_retained(account.clone(), path.clone(), lease)
+                .await?;
+            let scope = account.clone();
+            let base = cache.clone();
+            let candidate = path.clone();
+            let holds = (capacity.clone(), file_guard.clone(), category_guard.clone());
+            let valid = tokio::task::spawn_blocking(move || {
+                let _holds = holds;
+                proof.check(&scope, &base, &candidate)
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            account.validate()?;
+            if request.cancelled() || !cache_state().valid(&directory, request.epoch) {
+                return Err("CANCELLED".into());
+            }
+            if !valid {
+                return Err("FILE_OPEN_REFUSED: Legacy cache record changed".into());
+            }
+            return Ok(path.to_string_lossy().into_owned());
+        }
+    }
     let (file, source) = tokio::select! {
         result=tokio::time::timeout(Duration::from_secs(60),resolve())=>result.map_err(|_|"NETWORK_UNAVAILABLE: Preview lookup timed out")??,
         error=request.interrupted(&account)=>return Err(error),
@@ -1659,7 +1733,7 @@ pub(crate) fn cached_preview_at(
     let Some(identity) =
         Store::open(&account.root, account.owner)?.record::<String>("asset-identity-v1", key)?
     else {
-        return Ok(None);
+        return crate::legacy_external::historical_preview(account, cache, key);
     };
     let directory = private_directory(
         cache,

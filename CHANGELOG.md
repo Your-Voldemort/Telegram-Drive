@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Restore external opening for exact, account-recorded plain preview, thumbnail and offline cache files made by 3.9.x. Lazy registration retains content hashing, account isolation and substitution checks; user-chosen download folders are excluded.
+
 - Keep rehearsal tags as prereleases off latest, reuse paginated draft releases and await publication. Add packaged frontend/native startup readiness checks, artifact attestation verification and explicit workflow permissions; retain scheduled expiry and conditional signing. Collect owner-run release acceptance and local Android binary-only steps.
 
 - Bundle donation badges locally, recognize authenticated RPC errors as working proxy transport, reuse retained inventory for complete/partial storage insights, and generate new transfer IDs as UUIDs. Restrict external URLs and desktop file opening to app-produced files with account/identity verification; preserve sponsor and Android opening behavior.

@@ -128,6 +128,7 @@ The application caps a Telegram object at exactly **2,000,000,000 bytes**. Encry
 - Native Android playback with system media controls, resume, subtitle/audio-track selection, playback speed, and Picture-in-Picture where supported.
 - ZIP, RAR, and 7z archive browsing and extraction, including extraction back into Telegram Drive where the platform supports it.
 - Offline preview-cache controls for recently viewed standard files.
+- Recorded plain previews, thumbnails and ready offline copies from 3.9.x retain external opening after an update. The first open verifies and registers each private cache file; arbitrary files and edited copies remain refused.
 
 Some media depends on operating-system codec support or FFmpeg. Supported protected audio, video, and PDF content can use authenticated local byte-range streaming while the vault is unlocked, without publishing a persistent plaintext copy. See [encrypted-file limitations](#current-encrypted-file-limitations).
 

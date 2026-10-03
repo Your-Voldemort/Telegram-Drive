@@ -64,6 +64,7 @@ fn init_com_on_worker_thread() {
 pub mod bandwidth;
 pub mod commands;
 mod external_files;
+mod legacy_external;
 pub mod process_util;
 pub mod proxy_secret;
 pub mod resumable_upload;
@@ -531,10 +532,16 @@ async fn cmd_open_file_externally(
             .app_data_dir()
             .map_err(|e| e.to_string())?;
         let account = crate::workspace::AccountGuard::open(&root, None)?;
-        let path =
-            crate::external_files::validate_async(account.clone(), std::path::PathBuf::from(path))
-                .await?
-                .checked(&account)?;
+        let path = crate::external_files::open_async(
+            account.clone(),
+            _app_handle
+                .path()
+                .app_cache_dir()
+                .map_err(|e| e.to_string())?,
+            std::path::PathBuf::from(path),
+        )
+        .await?
+        .checked(&account)?;
         _app_handle
             .opener()
             .open_path(path.to_string_lossy().into_owned(), None::<&str>)
