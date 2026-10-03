@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, File, Maximize, Scan, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { TelegramFile } from '../../../types';
 import { isImageFile } from '../../../utils';
+import { isAndroidPlatform } from '../../../utils/platform';
 import { useSettings } from '../../../context/SettingsContext';
 import { userFacingError } from '../../../services/userFacingError';
 import {
@@ -13,6 +14,7 @@ import {
     getCachedPreview,
     getCachedThumbnail,
     loadPreview,
+    loadLocalPreview,
     loadThumbnail,
 } from '../../../services/imagePreviewCache';
 import i18n from '../../../i18n';
@@ -52,6 +54,7 @@ interface PreviewModalProps {
     prevFile?: TelegramFile | null;
     activeFolderId: number | null;
     localPath?: string;
+    onDownload?: () => void;
 }
 
 export function PreviewModal({
@@ -64,6 +67,7 @@ export function PreviewModal({
     nextFile,
     activeFolderId,
     localPath,
+    onDownload,
 }: PreviewModalProps) {
     const { t } = useTranslation();
     const { settings } = useSettings();
@@ -77,6 +81,7 @@ export function PreviewModal({
     const currentFileIdRef = useRef(file.id);
     currentFileIdRef.current = file.id;
     const imagePreview = isImageFile(file.name);
+    const heicPreview = !isAndroidPlatform && /\.hei[cf]$/i.test(file.name);
     const imageViewportRef = useRef<HTMLDivElement>(null);
     const fullImageRef = useRef<HTMLImageElement>(null);
     const [imageTransform, setImageTransform] = useState<ImageTransform>({ zoom: 1, pan: { x: 0, y: 0 } });
@@ -185,13 +190,13 @@ export function PreviewModal({
 
     useEffect(() => {
         const requestId = ++latestRequestRef.current;
-        if (localPath) {
+        if (localPath && !heicPreview) {
             setThumbnailSrc(null); setFullSrc(convertFileSrc(localPath));
             setFullReady(false); setLoading(imagePreview); setProgress(100); setError(null);
             fitImage(); activePointersRef.current.clear(); pointerGestureRef.current = null; setImageInteracting(false);
             return;
         }
-        const cachedPreview = getCachedPreview(file.id, activeFolderId);
+        const cachedPreview = localPath ? null : getCachedPreview(file.id, activeFolderId);
         const cachedThumbnail = imagePreview
             ? getCachedThumbnail(file.id, activeFolderId)
             : null;
@@ -217,10 +222,13 @@ export function PreviewModal({
             });
         }
 
-        loadPreview(file.id, activeFolderId).then((src) => {
+        const preview = localPath
+            ? loadLocalPreview(file.id, activeFolderId, localPath)
+            : loadPreview(file.id, activeFolderId);
+        preview.then((src) => {
             if (requestId !== latestRequestRef.current) return;
             if (!src) {
-                setError('Preview not available');
+                setError(t('workspace.preview_failed'));
                 setLoading(false);
                 return;
             }
@@ -228,10 +236,11 @@ export function PreviewModal({
             if (!imagePreview) setLoading(false);
         }).catch((loadError) => {
             if (requestId !== latestRequestRef.current) return;
-            setError(userFacingError(loadError, t));
+            setThumbnailSrc(null);
+            setError(heicPreview ? t('workspace.preview_failed') : userFacingError(loadError, t));
             setLoading(false);
         });
-    }, [file.id, file.name, activeFolderId, imagePreview, fitImage, localPath]);
+    }, [file.id, file.name, activeFolderId, imagePreview, heicPreview, fitImage, localPath]);
 
     // Prefetch only the likely next image, after the current one is fully decoded and
     // the browser is idle. Avoid speculative downloads when a bandwidth cap is active.
@@ -623,6 +632,13 @@ export function PreviewModal({
                     </div>
                 )}
 
+                {heicPreview && <div className="viewer-toolbar absolute -top-12 flex gap-2 text-white">
+                    <button type="button" className="viewer-control" onClick={() => {
+                        void (localPath ? Promise.resolve(localPath) : invoke<string>('cmd_get_preview', {messageId: file.id, folderId: activeFolderId}))
+                            .then(path => invoke('cmd_open_file_externally', {path})).catch(error => setError(userFacingError(error, t)));
+                    }}>{t('viewer.open_external')}</button>
+                    {onDownload && <button type="button" className="viewer-control" onClick={onDownload}>{t('files.download')}</button>}
+                </div>}
                 <div className="viewer-toolbar absolute -bottom-11 max-w-[min(80vw,40rem)] px-3 py-1.5 text-metadata text-white/70">
                     <span className="min-w-0 truncate" title={file.name}>{file.name}</span>
                     {typeof currentIndex === 'number' && typeof totalItems === 'number' && totalItems > 0 && (

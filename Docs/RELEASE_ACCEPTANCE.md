@@ -2,7 +2,7 @@
 
 Every check below is **UNRUN for this tree**. Local E2E results exercise synthetic native/browser/HTTP/storage boundaries and do not fill these rows. Record source revision, installed version, OS/device/WebView version, exact artifact/checksum/signature, date, result and sanitized evidence for each row. Keep sessions, API hashes, payment credentials, recovery codes and private keys out of screenshots/logs. A skipped or unavailable row stays UNRUN; record the release decision separately.
 
-Use a private test Telegram account/library and expendable files. Run the [recovery drill](ENCRYPTION_RECOVERY_DRILL.md), [sponsor matrix](SPONSOR_ACCEPTANCE.md), and [native localization review](LOCALIZATION_REVIEW.md) alongside this list. The roadmap's license/certificate/version decisions remain owner decisions. TDENC2 is frozen-format beta, pending independent cryptographic review. The rest of P2-08 is not implemented because locale ceiling approval was not given.
+Use a private test Telegram account/library and expendable files. Run the [recovery drill](ENCRYPTION_RECOVERY_DRILL.md), [sponsor matrix](SPONSOR_ACCEPTANCE.md), and [native localization review](LOCALIZATION_REVIEW.md) alongside this list. The roadmap's license/certificate/version decisions remain owner decisions. TDENC2 is frozen-format beta, pending independent cryptographic review. Remaining P2-08 translations follow the approved measured locale budget; native language review remains outstanding.
 
 ## Telegram and transfers
 
@@ -54,3 +54,9 @@ Repeat each applicable row on **Windows, macOS Intel, macOS Apple Silicon and Li
 ## Pending owner decisions and independent checks
 
 UNRUN: independent cryptographic review before TDENC2 general availability; separately approved fuzz research (no harness added); license/distribution review; signing/notarization certificates and first real signed build; version-line choice (independent desktop/Android lines or alignment at the next Android release); Android pending publication review; locale ceilings/full P2-08; sponsor matrix origin/interval. CI workflows, Windows/Linux builds and every packaged OS launch are UNRUN for this tree. Live Telegram, production supporter health, PayPal and real WebViews have not been exercised.
+
+## Desktop iPhone photo acceptance
+
+| Status | Exact steps | Expected result | What failure means |
+|---|---|---|---|
+| UNRUN on macOS, Windows and Linux | Use expendable real iPhone 12MP/48MP HEIC/HEIF photos with rotation/mirroring on each desktop OS. Record OS/WebView and decoder versions. Open a normal preview, gallery/slideshow and an offline pack; zoom/pan, navigate/prefetch, clear cache and repeat. Try no decoder/old FFmpeg, then open externally and download. Repeat with a protected source. | An upright complete primary image appears as a bounded JPEG; metadata identity and account changes invalidate it. Telegram thumbnails take priority. Recovery text and original actions work when no decoder qualifies. The original stays intact; protected sources produce no plaintext rendition. | Decoder/grid/transform incompatibility or platform lifecycle regression; record evidence and defer acceptance. Synthetic host measurements do not fill this row. |

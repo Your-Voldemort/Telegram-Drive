@@ -20,6 +20,9 @@ export async function desktopFixture(page: Page, options: {
   settings?: Record<string, unknown>;
   /** Base64 PDF listed as "Fixture report.pdf" and served through the preview command. */
   pdfBase64?: string;
+  heicBase64?: string;
+  heicJpegBase64?: string;
+  heicDecoderMissing?: boolean;
   video?: boolean;
   extraPhoto?: boolean;
   holdThumbnails?: boolean;
@@ -79,8 +82,8 @@ export async function desktopFixture(page: Page, options: {
       },
     };
     const file = (id: number, folder: number | null, owner = state.owner) => ({
-      id, folder_id: folder, ownerId: owner, name: `${owner === '101' ? 'Holiday' : 'Work'} ${folder === null ? 'saved' : 'folder'} ${options.video ? 'video.mp4' : 'photo.jpg'}`,
-      size: 1024, mime_type: options.video ? 'video/mp4' : 'image/jpeg', file_ext: options.video ? 'mp4' : 'jpg', created_at: '2026-09-07T12:00:00Z', folderName: folder === null ? 'Saved Messages' : 'Photos',
+      id, folder_id: folder, ownerId: owner, name: `${owner === '101' ? 'Holiday' : 'Work'} ${folder === null ? 'saved' : 'folder'} ${options.heicBase64 ? 'photo.HEIC' : options.video ? 'video.mp4' : 'photo.jpg'}`,
+      size: 1024, mime_type: options.heicBase64 ? 'image/heic' : options.video ? 'video/mp4' : 'image/jpeg', file_ext: options.heicBase64 ? 'heic' : options.video ? 'mp4' : 'jpg', created_at: '2026-09-07T12:00:00Z', folderName: folder === null ? 'Saved Messages' : 'Photos',
       encryption_state: 'plain', is_favorite: false, type: 'image',
     });
     const image = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#284b63"/><circle cx="320" cy="240" r="150" fill="#98d8ea"/></svg>')}`;
@@ -177,6 +180,11 @@ export async function desktopFixture(page: Page, options: {
             state.completedFileRequests.push({ ownerId: owner, requestId: args.requestId });
             return { ...result, complete: true };
           }
+          if (command === 'cmd_get_display_preview' && options.heicBase64) {
+            if (options.heicDecoderMissing) throw new Error('HEIC_PREVIEW_UNAVAILABLE');
+            return `data:image/jpeg;base64,${options.heicJpegBase64}`;
+          }
+          if (command === 'cmd_get_preview' && options.heicBase64) return `data:image/heic;base64,${options.heicBase64}`;
           if (command === 'cmd_get_preview' && args.messageId === 77 && options.pdfBase64) return `data:application/pdf;base64,${options.pdfBase64}`;
           if (command === 'cmd_get_stream_info') return { token: 'browser-fixture-token', base_url: `http://localhost:${options.streamingPort ?? 14201}`, operation_token: null };
           if (command === 'cmd_get_thumbnail' && options.video) {
@@ -185,7 +193,7 @@ export async function desktopFixture(page: Page, options: {
             if (state.holdThumbnails && owner === '101') await thumbnailGate;
             return image.replace(encodeURIComponent('#284b63'), encodeURIComponent(color));
           }
-          if (command === 'cmd_get_preview' || command === 'cmd_workspace_asset') return image;
+          if (command === 'cmd_get_preview' || command === 'cmd_get_display_preview' || command === 'cmd_workspace_asset') return image;
           if (command === 'cmd_get_bandwidth') return { up_bytes: 0, down_bytes: 0, limit_bytes: state.weeklyQuota, period: 'weekly', date: '2026-09-28' };
           if (command === 'cmd_set_weekly_quota') { if (state.quotaSaveFails) throw new Error('Storage unavailable'); state.weeklyQuota = args.limitBytes; localStorage.setItem('desktop-e2e-weekly-quota', String(args.limitBytes)); return { up_bytes: 0, down_bytes: 0, limit_bytes: state.weeklyQuota, period: 'weekly', date: '2026-09-28' }; }
           if (command === 'cmd_get_storage_insight') return { files: [file(80, 1)], scanned_count: 1200, duplicate_groups: 0, complete: false };

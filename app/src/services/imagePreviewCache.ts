@@ -67,7 +67,7 @@ function load(variant: Variant, fileId: number, folderId?: number | null): Promi
     const existing = pending.get(key);
     if (existing) return existing;
     const generation = cacheGeneration;
-    const request = invoke<string>(variant === 'preview' ? 'cmd_get_preview' : 'cmd_get_thumbnail', {
+    const request = invoke<string>(variant === 'preview' ? 'cmd_get_display_preview' : 'cmd_get_thumbnail', {
         messageId: fileId, folderId: folderId ?? null,
     }).then(async path => {
         if (!path || generation !== cacheGeneration) return null;
@@ -95,3 +95,9 @@ export const clearImageMemoryCaches = (notify = true): void => {
 export const setImageCacheAccount = (id: string | null): void => {
     if (owner !== id) { owner = id; clearImageMemoryCaches(false); }
 };
+
+export async function loadLocalPreview(fileId: number, folderId: number | null, localPath: string): Promise<string | null> {
+    const generation = cacheGeneration;
+    const path = await invoke<string>('cmd_get_display_preview', {messageId: fileId, folderId, localPath});
+    return path && generation === cacheGeneration ? normalizeAssetSource(path) : null;
+}

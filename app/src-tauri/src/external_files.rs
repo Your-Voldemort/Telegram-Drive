@@ -140,7 +140,7 @@ fn register_checked(
         account.validate()
     })
 }
-fn validate_lease(account: &AccountGuard, path: &Path) -> Result<ValidatedFile, String> {
+pub(crate) fn validate_lease(account: &AccountGuard, path: &Path) -> Result<ValidatedFile, String> {
     account.validate()?;
     let (absolute, canonical, identity) = location(path)?;
     let record = Store::open(&account.root, account.owner)?
@@ -162,6 +162,7 @@ fn validate_lease(account: &AccountGuard, path: &Path) -> Result<ValidatedFile, 
     Ok(ValidatedFile {
         path: canonical,
         identity,
+        fingerprint: record.digest,
     })
 }
 
@@ -186,6 +187,7 @@ pub(crate) async fn register_async(account: AccountGuard, path: PathBuf) -> Resu
     blocking(move || register(&account, &path)).await
 }
 pub(crate) struct ValidatedFile {
+    pub(crate) fingerprint: String,
     path: PathBuf,
     identity: Identity,
 }
@@ -218,7 +220,18 @@ pub(crate) async fn open_async(
     cache: PathBuf,
     path: PathBuf,
 ) -> Result<ValidatedFile, String> {
+    open_retained(account, cache, path, (), || Ok(())).await
+}
+pub(crate) async fn open_retained(
+    account: AccountGuard,
+    cache: PathBuf,
+    path: PathBuf,
+    lease: impl Send + 'static,
+    preflight: impl Fn() -> Result<(), String> + Send + 'static,
+) -> Result<ValidatedFile, String> {
     blocking(move || {
+        let _lease = lease;
+        preflight()?;
         let (absolute, _, _) = location(&path)?;
         let record_key = key(&absolute);
         let store = Store::open(&account.root, account.owner)?;
@@ -256,11 +269,14 @@ pub(crate) async fn open_async(
                 )?;
             }
         }
-        validate_lease(&account, &absolute)
+        let validated = validate_lease(&account, &absolute)?;
+        preflight()?;
+        Ok(validated)
     })
     .await
 }
 
+#[cfg(feature = "native-e2e")]
 pub(crate) async fn validate_async(
     account: AccountGuard,
     path: PathBuf,

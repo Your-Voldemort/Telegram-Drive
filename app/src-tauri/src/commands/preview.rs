@@ -450,6 +450,42 @@ pub async fn cmd_get_preview(
 }
 
 #[tauri::command]
+pub async fn cmd_get_display_preview(
+    message_id: i32,
+    folder_id: Option<i64>,
+    local_path: Option<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    let original = match local_path {
+        Some(path) => path,
+        None => compat_asset(app_handle.clone(), folder_id, message_id, false).await?,
+    };
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if crate::heic::is_name(&original) {
+        let root = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?;
+        let account = crate::workspace::AccountGuard::open(&root, None)?;
+        let cache = app_handle
+            .path()
+            .app_cache_dir()
+            .map_err(|e| e.to_string())?;
+        let tools = crate::heic::Tools::platform(app_handle.path().resource_dir().ok().as_deref());
+        return crate::workspace::assets::display_rendition_at(
+            cache,
+            account,
+            crate::workspace::store::file_key(folder_id, i64::from(message_id)),
+            original.into(),
+            tools,
+            None,
+        )
+        .await;
+    }
+    Ok(original)
+}
+
+#[tauri::command]
 pub async fn cmd_clean_preview_cache(app_handle: tauri::AppHandle) -> Result<(), String> {
     let cache = app_handle
         .path()

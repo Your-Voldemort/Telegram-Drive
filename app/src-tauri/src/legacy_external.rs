@@ -18,6 +18,13 @@ enum Origin {
 pub(crate) struct Proof {
     origin: Origin,
 }
+impl Proof {
+    pub(crate) fn matches_key(&self, expected: &str) -> bool {
+        match &self.origin {
+            Origin::Cache { key, .. } | Origin::Offline { key, .. } => key == expected,
+        }
+    }
+}
 fn private(base: &Path, parts: &[&str]) -> Result<Option<PathBuf>, String> {
     let mut directory = base.to_path_buf();
     for part in std::iter::once("").chain(parts.iter().copied()) {
@@ -149,7 +156,7 @@ fn exact_file(
         })
         && path.canonicalize().map_err(|e| e.to_string())? == directory.join(name))
 }
-fn current_allows(store: &Store, key: &str) -> Result<bool, String> {
+pub(crate) fn current_allows(store: &Store, key: &str) -> Result<bool, String> {
     if store.file(key)?.is_some_and(|file| !plain(&file)) {
         return Ok(false);
     }

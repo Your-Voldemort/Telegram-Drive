@@ -8,6 +8,8 @@ const files = [
   'app/src-tauri/src/native_e2e.rs',
   'app/src-tauri/tests/native_e2e.rs',
   'app/src-tauri/src/external_files.rs',
+  'app/src-tauri/src/heic.rs',
+  'app/src-tauri/src/process_budget.rs',
   'app/src-tauri/src/legacy_external.rs',
   'app/src-tauri/src/file_inventory.rs',
   'app/src-tauri/src/local_search.rs',

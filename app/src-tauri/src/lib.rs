@@ -64,7 +64,11 @@ fn init_com_on_worker_thread() {
 pub mod bandwidth;
 pub mod commands;
 mod external_files;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod heic;
 mod legacy_external;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod process_budget;
 pub mod process_util;
 pub mod proxy_secret;
 pub mod resumable_upload;
@@ -1429,6 +1433,7 @@ pub fn run() {
             commands::cmd_set_weekly_quota,
             commands::cmd_delete_preview_for_message,
             commands::cmd_get_preview,
+            commands::cmd_get_display_preview,
             commands::cmd_clean_preview_cache,
             commands::cmd_get_offline_cache_status,
             commands::cmd_get_offline_files,

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Display plain desktop HEIC/HEIF photos through separate, bounded JPEG renditions, including offline copies, gallery/slideshow and thumbnail fallback. Try macOS sips before user-installed FFmpeg 8.1+, preserve original-file actions, and show translated recovery text when no compatible decoder is available.
+
 - Restore external opening for exact, account-recorded plain preview, thumbnail and offline cache files made by 3.9.x. Lazy registration retains content hashing, account isolation and substitution checks; user-chosen download folders are excluded.
 
 - Keep rehearsal tags as prereleases off latest, reuse paginated draft releases and await publication. Add packaged frontend/native startup readiness checks, artifact attestation verification and explicit workflow permissions; retain scheduled expiry and conditional signing. Collect owner-run release acceptance and local Android binary-only steps.

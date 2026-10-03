@@ -89,10 +89,11 @@ fn category_lock(directory: &Path) -> Arc<RwLock<()>> {
         .clone()
 }
 
-struct ActivePath {
+pub(crate) struct ActivePath {
     path: PathBuf,
     token: String,
     disposable: AtomicBool,
+    cleanup_pin: AtomicBool,
 }
 impl ActivePath {
     fn new(path: PathBuf, token: String, disposable: bool) -> Self {
@@ -101,6 +102,7 @@ impl ActivePath {
             path,
             token,
             disposable: AtomicBool::new(disposable),
+            cleanup_pin: AtomicBool::new(false),
         }
     }
 }
@@ -111,8 +113,15 @@ impl Drop for ActivePath {
         if owned {
             state.paths.remove(&self.path);
         }
+        let disposable = self.disposable.load(Ordering::SeqCst);
+        let cleanup_pin = self.cleanup_pin.load(Ordering::SeqCst);
+        if owned && disposable && cleanup_pin {
+            // Keep pin mutation serialized, including canceled publication.
+            let _ = std::fs::remove_file(&self.path);
+            let _ = std::fs::remove_file(self.path.with_extension("pin"));
+        }
         drop(state);
-        if owned && self.disposable.load(Ordering::SeqCst) {
+        if owned && disposable && !cleanup_pin {
             let _ = std::fs::remove_file(&self.path);
         }
     }
@@ -684,12 +693,14 @@ impl TelegramAssetSource {
         media: Media,
         thumbnail: bool,
     ) -> Result<Self, String> {
-        let executable = if thumbnail {
+        let needs_video =
+            matches!(&media, Media::Document(d) if d.mime_type().and_then(video_format).is_some());
+        let executable = if thumbnail && chosen_thumbnail(&media).is_none() && needs_video {
             crate::transcode::detect_ffmpeg(&app).await
         } else {
             None
         };
-        Self::configured(
+        let source = Self::configured(
             account,
             client,
             media,
@@ -697,7 +708,16 @@ impl TelegramAssetSource {
             app.state::<Arc<BandwidthManager>>().inner().clone(),
             app.state::<Arc<NetworkConfig>>().inner().clone(),
             executable,
-        )
+        )?;
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let mut source = source;
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        if matches!(source.info.fallback, Some(ThumbnailInput::Heic(_))) {
+            source.info.fallback = Some(ThumbnailInput::Heic(crate::heic::Tools::platform(
+                app.path().resource_dir().ok().as_deref(),
+            )));
+        }
+        Ok(source)
     }
     fn configured(
         account: AccountGuard,
@@ -720,7 +740,21 @@ impl TelegramAssetSource {
             Media::Document(d) => d.mime_type(),
             _ => None,
         };
-        let fallback = if mime.is_some_and(|m| m.starts_with("image/")) {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let heic = crate::heic::is_mime(mime)
+            || matches!(&media, Media::Document(d) if crate::heic::is_name(d.name()));
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        let heic = false;
+        let fallback = if heic {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                Some(ThumbnailInput::Heic(crate::heic::Tools::platform(None)))
+            }
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            {
+                None
+            }
+        } else if mime.is_some_and(|m| m.starts_with("image/")) {
             Some(ThumbnailInput::Image)
         } else if thumbnail && thumbnail_size.is_none() && size <= THUMB_SOURCE_LIMIT {
             match mime.and_then(video_format) {
@@ -810,13 +844,22 @@ pub async fn cmd_workspace_asset(
     key: String,
     thumbnail: bool,
     request_id: Option<String>,
+    display: Option<bool>,
 ) -> Result<String, String> {
     let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let account = AccountGuard::open(&root, Some(&owner_id))?;
     let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?;
     let scope = account.clone();
     let lookup_key = key.clone();
-    asset_at(
+    let display_scope = (
+        cache.clone(),
+        account.clone(),
+        key.clone(),
+        request_id.clone(),
+    );
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let tools = crate::heic::Tools::platform(app.path().resource_dir().ok().as_deref());
+    let original = asset_at(
         cache,
         account,
         key,
@@ -833,7 +876,22 @@ pub async fn cmd_workspace_asset(
             }
         },
     )
-    .await
+    .await?;
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if display == Some(true) && !thumbnail && crate::heic::is_name(&original) {
+        return display_rendition_at(
+            display_scope.0,
+            display_scope.1,
+            display_scope.2,
+            original.into(),
+            tools,
+            display_scope.3,
+        )
+        .await;
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let _ = (display, display_scope);
+    Ok(original)
 }
 pub(crate) enum AssetLookup {
     Indexed(Box<WorkspaceFile>),
@@ -1147,7 +1205,9 @@ pub(crate) async fn remote_thumbnail_at(
                 is_pinned: false,
             },
         };
-        let executable = if chosen_thumbnail(&media).is_none() {
+        let needs_video =
+            matches!(&media, Media::Document(d) if d.mime_type().and_then(video_format).is_some());
+        let executable = if chosen_thumbnail(&media).is_none() && needs_video {
             crate::transcode::detect_path_ffmpeg().await
         } else {
             None
@@ -1530,6 +1590,8 @@ fn video_format(mime: &str) -> Option<&'static str> {
 static THUMBNAIL_DECODERS: OnceLock<Arc<Semaphore>> = OnceLock::new();
 #[derive(Clone)]
 pub(crate) enum ThumbnailInput {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    Heic(crate::heic::Tools),
     Image,
     Video {
         executable: PathBuf,
@@ -1553,9 +1615,23 @@ pub(crate) async fn render_thumbnail<H: Send + 'static>(
         .acquire_owned()
         .await
         .map_err(|_| "Thumbnail service stopped")?;
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let heic_permit = if matches!(kind, ThumbnailInput::Heic(_)) {
+        Some(
+            crate::heic::DECODERS
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| "Decoder stopped")?,
+        )
+    } else {
+        None
+    };
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
         let _holds = holds;
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let _heic_permit = heic_permit;
         #[cfg(feature = "native-e2e")]
         let _observation = DecodeObservation::new();
         let check = || -> Result<(), String> {
@@ -1577,6 +1653,11 @@ pub(crate) async fn render_thumbnail<H: Send + 'static>(
         let _partial = ActivePath::new(temporary.clone(), token.clone(), true);
         let image_input = match kind {
             ThumbnailInput::Image => input.clone(),
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            ThumbnailInput::Heic(tools) => {
+                crate::heic::decode(&input, &temporary, &tools, (480, 360), check)?;
+                temporary.clone()
+            }
             ThumbnailInput::Video { executable, format } => {
                 let mut options = std::fs::OpenOptions::new();
                 options.create_new(true).write(true);
@@ -1771,6 +1852,7 @@ pub(crate) async fn set_pinned_at(
     pinned: bool,
 ) -> Result<bool, String> {
     account.validate()?;
+    let cache = cache.canonicalize().unwrap_or(cache);
     let directory = private_directory(
         &cache,
         &[
@@ -1787,34 +1869,56 @@ pub(crate) async fn set_pinned_at(
             return Ok(false);
         };
         account.validate()?;
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let store = Store::open(&account.root, account.owner)?;
         let _mutation = cache_state();
         if !std::fs::symlink_metadata(&path)
             .is_ok_and(|meta| meta.file_type().is_file() && meta.len() > 0)
         {
             return Ok(false);
         }
-        let marker = path.with_extension("pin");
-        if pinned {
-            let mut options = std::fs::OpenOptions::new();
-            options.write(true).create(true).truncate(true);
-            #[cfg(unix)]
+        let paired = vec![path.clone()];
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let mut paired = paired;
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        if let Some(saved) = store.record::<HeicRendition>(
+            "heic-rendition-v1",
+            &heic_association_key(&key, &path.canonicalize().map_err(|e| e.to_string())?),
+        )? {
+            if saved.source == path
+                && saved.rendition.parent() == Some(directory.as_path())
+                && std::fs::symlink_metadata(&saved.rendition)
+                    .is_ok_and(|meta| meta.file_type().is_file())
             {
-                use std::os::unix::fs::OpenOptionsExt;
-                options.mode(0o600);
+                paired.push(saved.rendition);
             }
-            use std::io::Write;
-            let mut file = options.open(&marker).map_err(|e| e.to_string())?;
-            file.write_all(b"pinned").map_err(|e| e.to_string())?;
-            file.sync_all().map_err(|e| e.to_string())?;
-        } else if let Err(error) = std::fs::remove_file(&marker) {
-            if error.kind() != std::io::ErrorKind::NotFound {
-                return Err(error.to_string());
+        }
+        for path in &paired {
+            let marker = path.with_extension("pin");
+            if pinned {
+                let mut options = std::fs::OpenOptions::new();
+                options.write(true).create(true).truncate(true);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    options.mode(0o600);
+                }
+                use std::io::Write;
+                let mut file = options.open(&marker).map_err(|e| e.to_string())?;
+                file.write_all(b"pinned").map_err(|e| e.to_string())?;
+                file.sync_all().map_err(|e| e.to_string())?;
+            } else if let Err(error) = std::fs::remove_file(&marker) {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    return Err(error.to_string());
+                }
             }
         }
         drop(_mutation);
         if let Err(error) = account.validate() {
             if pinned {
-                let _ = std::fs::remove_file(marker);
+                for path in paired {
+                    let _ = std::fs::remove_file(path.with_extension("pin"));
+                }
             }
             return Err(error);
         }
@@ -1882,4 +1986,283 @@ pub(crate) async fn delete_cached_at(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[derive(serde::Deserialize, serde::Serialize)]
+struct HeicRendition {
+    source: PathBuf,
+    fingerprint: String,
+    rendition: PathBuf,
+}
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn heic_association_key(key: &str, source: &Path) -> String {
+    format!(
+        "{:x}",
+        Sha256::digest(
+            format!("heic-source-pair-v1:{key}:{}", source.to_string_lossy()).as_bytes()
+        )
+    )
+}
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn heic_source_allowed(
+    account: &AccountGuard,
+    cache: &Path,
+    key: &str,
+    original: &Path,
+) -> Result<(), String> {
+    account.validate()?;
+    let store = Store::open(&account.root, account.owner)?;
+    if !crate::legacy_external::current_allows(&store, key)? {
+        return Err("ENCRYPTED_PREVIEW_UNAVAILABLE".into());
+    }
+    // Fresh previews need not create a plaintext inventory record. Their exact
+    // raster identity and private account directory bind them to this file.
+    let directory = private_directory(
+        cache,
+        &[
+            "previews",
+            "workspace",
+            &account.owner.to_string(),
+            "previews",
+        ],
+        false,
+    )?;
+    if let Some(identity) = store.record::<String>("asset-identity-v1", key)? {
+        let prefix = format!(
+            "{:x}.",
+            Sha256::digest(format!("raster-v2:{key}:{identity}:false").as_bytes())
+        );
+        if original.parent() == Some(directory.as_path())
+            && original
+                .file_name()
+                .and_then(|v| v.to_str())
+                .is_some_and(|name| name.starts_with(&prefix))
+        {
+            return Ok(());
+        }
+    }
+    if let Some(proof) = crate::legacy_external::identify(account, cache, original)? {
+        if proof.matches_key(key) && proof.check(account, cache, original)? {
+            return Ok(());
+        }
+    }
+    Err("HEIC_SOURCE_REFUSED".into())
+}
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub(crate) async fn display_rendition_at(
+    cache: PathBuf,
+    account: AccountGuard,
+    key: String,
+    original: PathBuf,
+    tools: crate::heic::Tools,
+    request_id: Option<String>,
+) -> Result<String, String> {
+    if !crate::heic::is_name(original.to_str().unwrap_or_default()) {
+        return Ok(original.to_string_lossy().into_owned());
+    }
+    account.validate()?;
+    std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let cache = cache.canonicalize().map_err(|e| e.to_string())?;
+    cache_core::register(&cache, Some(&account.root))?;
+    let owner = account.owner.to_string();
+    let directory =
+        private_directory(&cache, &["previews", "workspace", &owner, "previews"], true)?;
+    let request = Request::new(&owner, request_id, directory.clone())?;
+    let capacity = ASSET_READERS
+        .get_or_init(|| Arc::new(Semaphore::new(3)))
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(|_| "Preview stopped")?;
+    let file_guard = file_lock(format!("{}:{owner}:{key}", cache.to_string_lossy()))
+        .await
+        .lock_owned()
+        .await;
+    let category = category_lock(&directory).read_owned().await;
+    let source_guard = ActivePath::new(
+        original.clone(),
+        format!("heic-source:{}", request.token),
+        false,
+    );
+    let legacy_guard = crate::commands::preview::LegacyPreviewUse::new(&original);
+    let holds = Arc::new((capacity, file_guard, category, source_guard, legacy_guard));
+    let scope = account.clone();
+    let base = cache.clone();
+    let source = original.clone();
+    let record_key = key.clone();
+    let flag = request.cancelled.clone();
+    let validated = crate::external_files::open_retained(
+        account.clone(),
+        cache.clone(),
+        original.clone(),
+        holds.clone(),
+        move || {
+            scope.validate()?;
+            if flag.load(Ordering::SeqCst) {
+                return Err("CANCELLED".into());
+            }
+            let metadata = std::fs::symlink_metadata(&source).map_err(|e| e.to_string())?;
+            if !metadata.file_type().is_file()
+                || metadata.len() == 0
+                || metadata.len() > crate::heic::SOURCE_LIMIT
+            {
+                return Err("HEIC_PREVIEW_UNAVAILABLE: Invalid or oversized source".into());
+            }
+            heic_source_allowed(&scope, &base, &record_key, &source)
+        },
+    )
+    .await?;
+    let fingerprint = validated.fingerprint.clone();
+    let original = validated.checked(&account)?;
+    let name = format!(
+        "{:x}.jpg",
+        Sha256::digest(
+            format!(
+                "heic-display-v1:{key}:{}:{fingerprint}",
+                original.to_string_lossy()
+            )
+            .as_bytes()
+        )
+    );
+    let target = directory.join(name);
+    let target_guard = ActivePath::new(target.clone(), request.token.clone(), false);
+    target_guard.cleanup_pin.store(true, Ordering::SeqCst);
+    let reservation = if target.exists() {
+        None
+    } else {
+        Some(Arc::new(
+            CacheReservation::reserve(
+                &directory,
+                &request.token,
+                crate::heic::OUTPUT_LIMIT * 2,
+                false,
+            )
+            .await?,
+        ))
+    };
+    let permit = if reservation.is_some() {
+        Some(
+            crate::heic::DECODERS
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| "Decoder stopped")?,
+        )
+    } else {
+        None
+    };
+    let flag = request.cancelled.clone();
+    let epoch = request.epoch;
+    // Every lease is retained by the worker even when its awaiting caller aborts.
+    tokio::task::spawn_blocking(move || {
+        // Tuple fields drop in order: clean target/marker before releasing
+        // the source, file and category leases, including error/unwind paths.
+        let leases = (target_guard, holds, permit);
+        let check = || -> Result<(), String> {
+            account.validate()?;
+            if flag.load(Ordering::SeqCst)
+                || !cache_state().valid(&directory, epoch)
+                || reservation.as_ref().is_some_and(|lease| lease.cancelled())
+            {
+                return Err("CANCELLED".into());
+            }
+            heic_source_allowed(&account, &cache, &key, &original)
+        };
+        check()?;
+        if target.is_file() {
+            crate::external_files::validate_lease(&account, &target)?.checked(&account)?;
+            let after = crate::external_files::validate_lease(&account, &original)?;
+            if after.fingerprint != fingerprint {
+                return Err("FILE_CHANGED: Preview source changed".into());
+            }
+            after.checked(&account)?;
+            check()?;
+            return Ok(target.to_string_lossy().into_owned());
+        }
+        leases.0.disposable.store(true, Ordering::SeqCst);
+        crate::heic::decode(&original, &target, &tools, (4096, 4096), check)?;
+        let after = crate::external_files::validate_lease(&account, &original)?;
+        if after.fingerprint != fingerprint {
+            return Err("FILE_CHANGED: Preview source changed".into());
+        }
+        after.checked(&account)?;
+        check()?;
+        crate::external_files::register(&account, &target)?;
+        let store = Store::open(&account.root, account.owner)?;
+        store.transaction(|| {
+            check()?;
+            store.put_record(
+                "heic-rendition-v1",
+                &heic_association_key(&key, &original),
+                &HeicRendition {
+                    source: original.clone(),
+                    fingerprint,
+                    rendition: target.clone(),
+                },
+            )?;
+            check()
+        })?;
+        {
+            let _mutation = cache_state();
+            let inherit_pin = kept(&original);
+            #[cfg(feature = "native-e2e")]
+            wait_heic_pin_gate()?;
+            if inherit_pin {
+                // Replace a marker entry rather than following a planted link.
+                let marker = target.with_extension("pin");
+                if let Err(error) = std::fs::remove_file(&marker) {
+                    if error.kind() != std::io::ErrorKind::NotFound {
+                        return Err(error.to_string());
+                    }
+                }
+                let mut options = std::fs::OpenOptions::new();
+                options.write(true).create_new(true);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    options.mode(0o600);
+                }
+                use std::io::Write;
+                let mut file = options.open(&marker).map_err(|e| e.to_string())?;
+                file.write_all(b"pinned").map_err(|e| e.to_string())?;
+            }
+        }
+        check()?;
+        leases.0.disposable.store(false, Ordering::SeqCst);
+        Ok(target.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub(crate) fn track_decoder_partial(path: &Path, destination: &Path) -> Option<ActivePath> {
+    let token = cache_state().paths.get(destination).cloned()?;
+    Some(ActivePath::new(path.to_path_buf(), token, true))
+}
+
+#[cfg(feature = "native-e2e")]
+static HEIC_PIN_GATE: std::sync::Mutex<Option<(PathBuf, PathBuf)>> = std::sync::Mutex::new(None);
+#[cfg(feature = "native-e2e")]
+pub(crate) fn test_heic_pin_gate(started: PathBuf, release: PathBuf) {
+    *HEIC_PIN_GATE.lock().unwrap_or_else(|e| e.into_inner()) = Some((started, release));
+}
+#[cfg(feature = "native-e2e")]
+fn wait_heic_pin_gate() -> Result<(), String> {
+    let gate = HEIC_PIN_GATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take();
+    if let Some((started, release)) = gate {
+        std::fs::write(started, b"ready").map_err(|e| e.to_string())?;
+        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+        while !release.is_file() {
+            if std::time::Instant::now() >= deadline {
+                return Err("HEIC pin fixture deadline".into());
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    Ok(())
 }

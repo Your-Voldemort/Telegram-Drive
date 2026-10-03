@@ -645,7 +645,11 @@ fn fixture_asset(
                 .map_err(error)
         })
         .transpose()?;
-    let fallback = if request["video"].as_bool().unwrap_or(false) {
+    let fallback = if request["mime"] == "image/heic" || request["mime"] == "image/heif" {
+        Some(crate::workspace::assets::ThumbnailInput::Heic(
+            heic_fixture_tools(root, request)?,
+        ))
+    } else if request["video"].as_bool().unwrap_or(false) {
         Some(crate::workspace::assets::ThumbnailInput::Video {
             executable: child(root, text(request, "ffmpeg")?)?,
             format: "mov",
@@ -674,10 +678,13 @@ fn fixture_asset(
         file: crate::models::FileMetadata {
             id,
             folder_id: folder,
-            name: "Unindexed fixture file.png".into(),
+            name: request["filename"]
+                .as_str()
+                .unwrap_or("Unindexed fixture file.png")
+                .into(),
             size,
-            mime_type: Some("image/png".into()),
-            file_ext: Some("png".into()),
+            mime_type: Some(request["mime"].as_str().unwrap_or("image/png").into()),
+            file_ext: Some(request["extension"].as_str().unwrap_or("png").into()),
             created_at: "2026-10-01T00:00:00Z".into(),
             icon_type: "file".into(),
             encryption_state: request["protection"].as_str().unwrap_or("plain").into(),
@@ -1057,7 +1064,13 @@ impl Driver {
             | "inventory_timer_lifecycle"
             | "inventory_deadline"
             | "legacy_inventory_write" => self.dispatch_inventory(request).await,
-            "asset_read"
+            "heic_pin_gate"
+            | "heic_pin_start"
+            | "heic_expected_pixels"
+            | "asset_display_local"
+            | "heic_status"
+            | "asset_read"
+            | "asset_display_read"
             | "asset_start"
             | "workspace_asset_read"
             | "native_preview_prepare"
@@ -1085,6 +1098,7 @@ impl Driver {
             | "reader_copy_cancel"
             | "reader_copy_finish"
             | "asset_limits"
+            | "asset_abort"
             | "asset_finish"
             | "asset_cancel"
             | "asset_clear"
@@ -2312,7 +2326,84 @@ impl Driver {
 
     async fn dispatch_assets(&mut self, request: Value) -> Result<Value, String> {
         match text(&request, "command")? {
-            "asset_read" | "asset_start" | "workspace_asset_read" => {
+            "heic_pin_gate" => {
+                crate::workspace::assets::test_heic_pin_gate(
+                    self.root.join("heic-pin.checked"),
+                    self.root.join("heic-pin.release"),
+                );
+                Ok(json!(true))
+            }
+            "heic_pin_start" => {
+                let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
+                let root = self.root.clone();
+                let key = crate::workspace::store::file_key(None, 1);
+                self.vault_tasks.insert(
+                    "heic-pin".into(),
+                    tokio::spawn(async move {
+                        let result = crate::workspace::assets::set_pinned_at(
+                            root.join("asset-cache"),
+                            account,
+                            key,
+                            false,
+                        )
+                        .await?;
+                        std::fs::write(root.join("heic-pin.done"), b"done").map_err(error)?;
+                        Ok(json!(result))
+                    }),
+                );
+                Ok(json!(true))
+            }
+            "heic_expected_pixels" => {
+                let rendered =
+                    image::open(produced_fixture_path(&self.root, text(&request, "path")?)?)
+                        .map_err(error)?
+                        .to_rgb8();
+                let reference = image::open(produced_fixture_path(
+                    &self.root,
+                    text(&request, "reference")?,
+                )?)
+                .map_err(error)?;
+                let expected = match request["transform"].as_str() {
+                    Some("rotation") => reference.rotate270(),
+                    Some("mirror") => reference.flipv(),
+                    _ => reference,
+                }
+                .to_rgb8();
+                if rendered.dimensions() != expected.dimensions() {
+                    return Err("Orientation dimensions differ".into());
+                }
+                let total: u64 = rendered
+                    .as_raw()
+                    .iter()
+                    .zip(expected.as_raw())
+                    .map(|(a, b)| u64::from(a.abs_diff(*b)))
+                    .sum();
+                Ok(
+                    json!({"dimensions":rendered.dimensions(), "meanAbsoluteChannelError":total as f64 / rendered.as_raw().len() as f64}),
+                )
+            }
+            "asset_display_local" => {
+                let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
+                let key = crate::workspace::store::file_key(
+                    request["folder"].as_i64(),
+                    request["id"].as_i64().unwrap_or(1),
+                );
+                Ok(json!(
+                    crate::workspace::assets::display_rendition_at(
+                        self.root.join("asset-cache"),
+                        account,
+                        key,
+                        produced_fixture_path(&self.root, text(&request, "path")?)?,
+                        heic_fixture_tools(&self.root, &request)?,
+                        None
+                    )
+                    .await?
+                ))
+            }
+            "heic_status" => Ok(
+                json!({"decodes":crate::heic::reports(), "processes":crate::process_budget::observations()}),
+            ),
+            "asset_read" | "asset_display_read" | "asset_start" | "workspace_asset_read" => {
                 let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
                 let cache = self.root.join("asset-cache");
                 let root = self.root.clone();
@@ -2329,8 +2420,20 @@ impl Driver {
                     }
                     let (started, wait) = tokio::sync::oneshot::channel();
                     let scope = account.clone();
+                    let display = request["display"].as_bool().unwrap_or(false);
+                    let display_tools = if display {
+                        heic_fixture_tools(&root, &request)?
+                    } else {
+                        crate::heic::Tools::default()
+                    };
+                    let display_scope = (
+                        cache.clone(),
+                        account.clone(),
+                        key.clone(),
+                        request_id.clone(),
+                    );
                     self.asset_task = Some(tokio::spawn(async move {
-                        crate::workspace::assets::asset_at(
+                        let original = crate::workspace::assets::asset_at(
                             cache,
                             account,
                             key,
@@ -2345,12 +2448,32 @@ impl Driver {
                                 fixture_asset(&root, &scope, &request, downloads)
                             },
                         )
-                        .await
+                        .await?;
+                        if display {
+                            crate::workspace::assets::display_rendition_at(
+                                display_scope.0,
+                                display_scope.1,
+                                display_scope.2,
+                                original.into(),
+                                display_tools,
+                                display_scope.3,
+                            )
+                            .await
+                        } else {
+                            Ok(original)
+                        }
                     }));
                     wait.await.map_err(error)?;
                     Ok(json!(true))
                 } else {
                     let scope = account.clone();
+                    let display = request["command"] == "asset_display_read";
+                    let display_scope = (cache.clone(), account.clone(), key.clone());
+                    let display_tools = if display {
+                        heic_fixture_tools(&root, &request)?
+                    } else {
+                        crate::heic::Tools::default()
+                    };
                     let path = crate::workspace::assets::asset_at(
                         cache,
                         account,
@@ -2385,6 +2508,19 @@ impl Driver {
                         },
                     )
                     .await?;
+                    let path = if display {
+                        crate::workspace::assets::display_rendition_at(
+                            display_scope.0,
+                            display_scope.1,
+                            display_scope.2,
+                            path.into(),
+                            display_tools,
+                            None,
+                        )
+                        .await?
+                    } else {
+                        path
+                    };
                     Ok(
                         json!({"path":path,"downloads":self.asset_downloads.load(std::sync::atomic::Ordering::SeqCst)}),
                     )
@@ -2581,10 +2717,10 @@ impl Driver {
                     file: crate::models::FileMetadata {
                         id,
                         folder_id: None,
-                        name: "fixture.png".into(),
+                        name: request["filename"].as_str().unwrap_or("fixture.png").into(),
                         size,
-                        mime_type: Some("image/png".into()),
-                        file_ext: Some("png".into()),
+                        mime_type: Some(request["mime"].as_str().unwrap_or("image/png").into()),
+                        file_ext: Some(request["extension"].as_str().unwrap_or("png").into()),
                         created_at: "2026-10-01T00:00:00Z".into(),
                         icon_type: "file".into(),
                         encryption_state: request["protection"].as_str().unwrap_or("plain").into(),
@@ -2809,6 +2945,12 @@ impl Driver {
                         .as_u64()
                         .ok_or("Missing thumbnail limit")?,
                 );
+                Ok(json!(true))
+            }
+            "asset_abort" => {
+                let task = self.asset_task.take().ok_or("No asset task")?;
+                task.abort();
+                let _ = task.await;
                 Ok(json!(true))
             }
             "asset_finish" => Ok(json!(self
@@ -4588,4 +4730,52 @@ fn produced_fixture_path(root: &Path, relative: &str) -> Result<PathBuf, String>
         return Err("Produced fixture path escaped its root".into());
     }
     Ok(path)
+}
+
+fn heic_fixture_tools(root: &Path, request: &Value) -> Result<crate::heic::Tools, String> {
+    match request["heicTools"].as_str() {
+        Some("sips") => Ok(crate::heic::Tools {
+            sips: Some(PathBuf::from("/usr/bin/sips")),
+            ffmpeg: vec![],
+        }),
+        Some("ffmpeg") => Ok(crate::heic::Tools {
+            sips: None,
+            ffmpeg: vec![PathBuf::from("/usr/local/bin/ffmpeg")],
+        }),
+        Some("missing") => Ok(crate::heic::Tools::default()),
+        _ => {
+            let name = if cfg!(windows) {
+                "heic-helper.exe"
+            } else {
+                "heic-helper"
+            };
+            let helper = root.join(name);
+            if !helper.exists() {
+                // Same immutable fixture executable, avoiding a cold103MB copy/signature scan.
+                let executable = std::env::current_exe().map_err(error)?;
+                if std::fs::hard_link(&executable, &helper).is_err() {
+                    std::fs::copy(executable, &helper).map_err(error)?;
+                }
+                // Prime the103MB fixture executable's platform signature check.
+                // Real FFmpeg probes retain the production2s deadline. This
+                // controlled helper proves lifecycle behavior, never cold startup.
+                let mut probe = std::process::Command::new(&helper);
+                probe.arg("-version");
+                let outcome = crate::process_budget::run(
+                    probe,
+                    std::time::Instant::now() + Duration::from_secs(20),
+                    true,
+                    || Ok(()),
+                    None,
+                )?;
+                if !outcome.success {
+                    return Err("Controlled helper startup failed".into());
+                }
+            }
+            Ok(crate::heic::Tools {
+                sips: None,
+                ffmpeg: vec![helper],
+            })
+        }
+    }
 }

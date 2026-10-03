@@ -122,6 +122,7 @@ The application caps a Telegram object at exactly **2,000,000,000 bytes**. Encry
 ### Viewing, playback, and archives
 
 - Lazy-loaded thumbnails and bounded memory/disk preview caches.
+- Desktop HEIC/HEIF still images use bounded JPEG display renditions in previews, gallery/slideshow and offline viewing. macOS tries `/usr/bin/sips` first; other desktops need user-installed FFmpeg 8.1 or newer. External opening and downloads keep the original. See [HEIC preview limits](Docs/HEIC_PREVIEW.md).
 - A desktop image viewer with zoom, pan, fit-to-window, actual-size, wheel, double-click, and keyboard navigation controls.
 - Built-in PDF viewer and audio player.
 - Video playback with seeking, HLS/fMP4 streaming, remuxing/transcoding fallbacks, and cache recovery for supported plaintext media.

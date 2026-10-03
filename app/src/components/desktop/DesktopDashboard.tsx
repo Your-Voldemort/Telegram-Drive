@@ -968,6 +968,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <LazyFeatureBoundary key={`preview:${previewFileKey(previewFile)}`}>
                     <LazyPreviewModal
                         file={previewFile}
+                        onDownload={() => queueDownload(previewFile.id, previewFile.name, sourceFolder(previewFile, activeFolderId), previewFile.size)}
                         activeFolderId={sourceFolder(previewFile, activeFolderId)}
                         localPath={localPreview?.key === previewFileKey(previewFile) ? localPreview.path : undefined}
                         onClose={() => setPreviewFile(null)}

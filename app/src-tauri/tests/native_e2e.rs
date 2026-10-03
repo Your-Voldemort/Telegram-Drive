@@ -7675,3 +7675,465 @@ fn legacy_external_aborted_preview_hash_retains_cache_guards_until_clear_can_fin
         );
     }
 }
+
+#[test]
+fn heic_display_pipeline_produces_a_jpeg_and_keeps_original_for_external_opening() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "synthetic.heic",
+        include_bytes!("../test-support/fixtures/heic/tiled-12mp.heic"),
+    );
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let request = json!({"command":"asset_display_read","owner":"101","source":"synthetic.heic","filename":"Synthetic.HEIC","extension":"heic","mime":"image/heic"});
+    let display = app.ok(request);
+    let path = PathBuf::from(display["path"].as_str().unwrap());
+    assert_eq!(
+        path.extension().unwrap(),
+        "jpg",
+        "HEIC display must use a separate JPEG rendition"
+    );
+    assert_eq!(image::image_dimensions(&path).unwrap(), (4032, 3024));
+    let original = app.ok(json!({"command":"asset_read","owner":"101","source":"synthetic.heic","filename":"Synthetic.HEIC","extension":"heic","mime":"image/heic"}));
+    let original_path = PathBuf::from(original["path"].as_str().unwrap());
+    assert_ne!(original_path, path);
+    assert_eq!(
+        std::fs::read(&original_path).unwrap(),
+        include_bytes!("../test-support/fixtures/heic/tiled-12mp.heic")
+    );
+    app.ok(json!({"command":"external_file_open","path":original_path.strip_prefix(fixture.0.canonicalize().unwrap()).unwrap().to_string_lossy()}));
+}
+
+#[test]
+fn heic_thumbnail_fallback_uses_a_full_primary_image_when_telegram_has_no_thumbnail() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "synthetic.heic",
+        include_bytes!("../test-support/fixtures/heic/tiled-12mp.heic"),
+    );
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let image = app.ok(json!({"command":"asset_read","owner":"101","source":"synthetic.heic","filename":"Synthetic.heic","extension":"heic","mime":"image/heic","thumbnail":true}));
+    assert_eq!(
+        image::image_dimensions(image["path"].as_str().unwrap()).unwrap(),
+        (480, 360)
+    );
+}
+
+fn heic_fixture() -> (Fixture, Backend) {
+    let fixture = Fixture::new();
+    fixture.write(
+        "synthetic.heic",
+        include_bytes!("../test-support/fixtures/heic/small.heic"),
+    );
+    fixture.write(
+        "heic-frame.jpg",
+        include_bytes!("../test-support/fixtures/heic/small-reference.jpg"),
+    );
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    (fixture, app)
+}
+fn heic_request() -> Value {
+    json!({"command":"asset_display_read","owner":"101","source":"synthetic.heic","filename":"Synthetic.heic","extension":"heic","mime":"image/heic"})
+}
+fn wait_heic_process(fixture: &Fixture) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !fixture.path("heic-pid").is_file() {
+        assert!(
+            Instant::now() < deadline,
+            "Controlled decoder did not start"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+#[test]
+fn heic_rejects_corrupt_oversized_old_missing_and_partial_tile_decoders() {
+    for mode in [
+        "corrupt",
+        "oversized",
+        "old",
+        "missing",
+        "tile",
+        "oversize",
+        "fail",
+    ] {
+        let (fixture, mut app) = heic_fixture();
+        fixture.write("heic-mode", mode);
+        if mode == "corrupt" {
+            fixture.write(
+                "synthetic.heic",
+                include_bytes!("../test-support/fixtures/heic/corrupt.heic"),
+            );
+        }
+        if mode == "oversized" {
+            fixture.write(
+                "synthetic.heic",
+                include_bytes!("../test-support/fixtures/heic/oversized.heic"),
+            );
+        }
+        if mode == "tile" {
+            fixture.write(
+                "synthetic.heic",
+                include_bytes!("../test-support/fixtures/heic/tiled-12mp.heic"),
+            );
+            fixture.write(
+                "heic-frame.jpg",
+                include_bytes!("../test-support/fixtures/heic/tiled-12mp-reference.jpg"),
+            );
+        }
+        let mut request = heic_request();
+        if mode == "missing" {
+            request["heicTools"] = json!("missing");
+        }
+        let failure = app.failure(request);
+        assert!(failure.starts_with("HEIC_"), "{mode}: {failure}");
+        let original = app.ok(json!({"command":"asset_cached","owner":"101"}));
+        for entry in
+            std::fs::read_dir(Path::new(original.as_str().unwrap()).parent().unwrap()).unwrap()
+        {
+            let path = entry.unwrap().path();
+            assert!(
+                !path
+                    .extension()
+                    .is_some_and(|ext| matches!(ext.to_str(), Some("part" | "source" | "jpg"))),
+                "Failed decode left bytes: {path:?}"
+            );
+        }
+        assert!(original.as_str().unwrap().ends_with(".heic"));
+        app.ok(json!({"command":"external_file_open","path":Path::new(original.as_str().unwrap()).strip_prefix(fixture.0.canonicalize().unwrap()).unwrap().to_string_lossy()}));
+    }
+}
+#[test]
+fn heic_reuse_pin_unpin_and_clear_preserve_the_original_relationship() {
+    let (_fixture, mut app) = heic_fixture();
+    let first = app.ok(heic_request());
+    let rendition = PathBuf::from(first["path"].as_str().unwrap());
+    let second = app.ok(heic_request());
+    assert_eq!(first, second);
+    let status = app.ok(json!({"command":"heic_status"}));
+    assert_eq!(status["decodes"].as_array().unwrap().len(), 1);
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":true}));
+    assert!(rendition.with_extension("pin").is_file());
+    app.ok(json!({"command":"asset_limits","previews":1024,"thumbnails":1024}));
+    assert_eq!(
+        app.ok(heic_request())["path"],
+        first["path"],
+        "Pinned cache hits need no output reservation"
+    );
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+    assert!(rendition.is_file());
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":false}));
+    assert!(!rendition.with_extension("pin").exists());
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+    assert!(!rendition.exists());
+}
+#[test]
+fn heic_caller_abort_clear_and_account_change_terminate_the_decoder() {
+    for operation in ["abort", "clear", "account"] {
+        let (fixture, mut app) = heic_fixture();
+        fixture.write("heic-mode", "wait");
+        let mut request = heic_request();
+        request["command"] = json!("asset_start");
+        request["display"] = json!(true);
+        request["requestId"] = json!("heic-lifecycle");
+        app.ok(request);
+        wait_heic_process(&fixture);
+        if operation == "abort" {
+            app.ok(json!({"command":"asset_abort"}));
+        }
+        if operation == "account" {
+            app.ok(json!({"command":"seed_account","owner":202}));
+            assert!(app
+                .failure(json!({"command":"asset_finish"}))
+                .contains("ACCOUNT_CHANGED"));
+        }
+        if operation != "account" {
+            app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+        }
+        if operation == "clear" {
+            assert!(app
+                .failure(json!({"command":"asset_finish"}))
+                .contains("CANCELLED"));
+        }
+        let status = app.ok(json!({"command":"heic_status"}));
+        assert!(status["decodes"].as_array().unwrap().is_empty());
+        assert!(status["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["outcome"] == "CANCELLED"
+                || item["outcome"]
+                    .as_str()
+                    .is_some_and(|v| v.contains("ACCOUNT_CHANGED"))));
+    }
+}
+#[test]
+fn heic_source_mutation_during_decode_never_publishes_a_rendition() {
+    let (fixture, mut app) = heic_fixture();
+    fixture.write("heic-mode", "gate");
+    let mut request = heic_request();
+    request["command"] = json!("asset_start");
+    request["display"] = json!(true);
+    app.ok(request);
+    wait_heic_process(&fixture);
+    let original = app.ok(json!({"command":"asset_cached","owner":"101"}));
+    std::fs::write(original.as_str().unwrap(), b"modified after verification").unwrap();
+    fixture.write("heic-release", b"ready");
+    assert!(app
+        .failure(json!({"command":"asset_finish"}))
+        .contains("modified"));
+    assert_eq!(
+        app.ok(json!({"command":"heic_status"}))["decodes"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1,
+        "The decoder completed; publication failed on its source digest"
+    );
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+}
+#[test]
+fn heic_memory_threshold_terminates_a_touching_decoder_process() {
+    let (fixture, mut app) = heic_fixture();
+    fixture.write("heic-mode", "memory");
+    let failure = app.failure(heic_request());
+    assert!(
+        failure.contains("MEMORY_LIMIT") || failure.contains("HEIC_DECODE_FAILED"),
+        "{failure}"
+    );
+    let status = app.ok(json!({"command":"heic_status"}));
+    #[cfg(target_os = "macos")]
+    assert!(status["processes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["outcome"] == "HEIC_MEMORY_LIMIT"
+            && item["metrics"]["sampled_peak_bytes"].as_u64().unwrap() > 1024 * 1024 * 1024));
+    #[cfg(not(target_os = "macos"))]
+    {
+        let threshold = status["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["outcome"] == "HEIC_MEMORY_LIMIT");
+        let denied = fixture.path("heic-memory-denied");
+        assert!(
+            threshold || denied.is_file(),
+            "The controlled process must be stopped by a memory control"
+        );
+        if denied.is_file() {
+            let attempted = std::fs::read_to_string(denied)
+                .unwrap()
+                .parse::<u64>()
+                .unwrap();
+            let cap = if cfg!(windows) {
+                1024 * 1024 * 1024
+            } else {
+                2 * 1024 * 1024 * 1024
+            };
+            assert!(attempted <= cap + 8 * 1024 * 1024);
+        }
+    }
+    println!("HEIC memory containment: {status}");
+    assert!(status["decodes"].as_array().unwrap().is_empty());
+}
+#[test]
+fn heic_telegram_thumbnail_wins_without_a_decoder_and_protected_sources_are_refused() {
+    let (fixture, mut app) = heic_fixture();
+    let mut request = heic_request();
+    request["command"] = json!("asset_read");
+    request["thumbnail"] = json!(true);
+    request["thumbnailSource"] = json!("heic-frame.jpg");
+    request["heicTools"] = json!("missing");
+    let result = app.ok(request);
+    assert_eq!(
+        image::image_dimensions(result["path"].as_str().unwrap()).unwrap(),
+        (480, 360)
+    );
+    let mut request = heic_request();
+    request["protection"] = json!("vault");
+    request["id"] = json!(2);
+    assert!(app
+        .failure(request)
+        .starts_with("ENCRYPTED_PREVIEW_UNAVAILABLE"));
+    assert!(app.ok(json!({"command":"heic_status"}))["decodes"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(!fixture.path("heic-pid").exists());
+}
+#[test]
+fn heic_original_bytes_remain_charged_to_the_preview_budget() {
+    let (_fixture, mut app) = heic_fixture();
+    // Reserve16MiB for output plus retained original bytes; a16MiB total is insufficient.
+    app.ok(json!({"command":"asset_limits","previews":16 * 1024 * 1024,"thumbnails":1024 * 1024}));
+    let failure = app.failure(heic_request());
+    assert!(
+        failure.contains("cache") || failure.contains("CACHE"),
+        "{failure}"
+    );
+    assert!(app.ok(json!({"command":"heic_status"}))["decodes"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn heic_offline_pack_sources_require_exact_plain_account_records() {
+    let (fixture, mut app) = heic_fixture();
+    let record = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"synthetic.heic","category":"offline","filename":"Synthetic.heic","extension":"heic","mime":"image/heic"}));
+    let path = record["path"].as_str().unwrap();
+    let displayed = app.ok(json!({"command":"asset_display_local","owner":"101","path":path}));
+    assert_eq!(
+        image::image_dimensions(displayed.as_str().unwrap()).unwrap(),
+        (240, 180)
+    );
+    assert!(app
+        .failure(json!({"command":"asset_display_local","owner":"101","path":path,"id":2}))
+        .contains("SOURCE_REFUSED"));
+    app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"synthetic.heic","protection":"vault","updateOnly":true}));
+    assert!(app
+        .failure(json!({"command":"asset_display_local","owner":"101","path":path}))
+        .contains("ENCRYPTED_PREVIEW_UNAVAILABLE"));
+    assert!(fixture.path("heic-frame.jpg").is_file());
+}
+#[test]
+fn heic_explicit_cancellation_and_deadline_remove_partial_outputs() {
+    for operation in ["cancel", "deadline"] {
+        let (fixture, mut app) = heic_fixture();
+        fixture.write("heic-mode", "wait");
+        let mut request = heic_request();
+        request["command"] = json!("asset_start");
+        request["display"] = json!(true);
+        request["requestId"] = json!("heic-cancel");
+        app.ok(request);
+        wait_heic_process(&fixture);
+        if operation == "cancel" {
+            app.ok(json!({"command":"asset_cancel","owner":"101","requestId":"heic-cancel"}));
+        }
+        let failure = app.failure(json!({"command":"asset_finish"}));
+        assert!(
+            failure.contains(if operation == "cancel" {
+                "CANCELLED"
+            } else {
+                "DEADLINE"
+            }),
+            "{failure}"
+        );
+        app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+        assert!(app.ok(json!({"command":"heic_status"}))["decodes"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+    }
+}
+
+#[test]
+fn heic_review_source_limit_refuses_a_recorded_large_file_before_hashing() {
+    let (fixture, mut app) = heic_fixture();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(fixture.path("synthetic.heic"))
+        .unwrap()
+        .set_len(64 * 1024 * 1024 + 1)
+        .unwrap();
+    let record = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"synthetic.heic","category":"offline","filename":"Synthetic.heic","extension":"heic","mime":"image/heic"}));
+    let before = app.ok(json!({"command":"external_file_status"}));
+    assert!(app
+        .failure(json!({"command":"asset_display_local","owner":"101","path":record["path"]}))
+        .starts_with("HEIC_"));
+    let after = app.ok(json!({"command":"external_file_status"}));
+    assert_eq!(
+        before[1].as_u64().unwrap(),
+        after[1].as_u64().unwrap(),
+        "A rejected source must not be fully hashed"
+    );
+}
+#[test]
+fn heic_review_offline_view_does_not_orphan_an_online_rendition_pin() {
+    let (_fixture, mut app) = heic_fixture();
+    let online = app.ok(heic_request());
+    let rendition = PathBuf::from(online["path"].as_str().unwrap());
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":true}));
+    assert!(rendition.with_extension("pin").exists());
+    let record = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"synthetic.heic","category":"offline","filename":"Synthetic.heic","extension":"heic","mime":"image/heic"}));
+    app.ok(json!({"command":"asset_display_local","owner":"101","path":record["path"]}));
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":false}));
+    assert!(
+        !rendition.with_extension("pin").exists(),
+        "Offline viewing must not replace the online pin association"
+    );
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+    assert!(!rendition.exists());
+}
+
+#[test]
+fn heic_pin_inheritance_cannot_recreate_a_pin_after_concurrent_unpinning() {
+    let (fixture, mut app) = heic_fixture();
+    let mut original = heic_request();
+    original["command"] = json!("asset_read");
+    app.ok(original);
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":true}));
+    app.ok(json!({"command":"heic_pin_gate"}));
+    let mut request = heic_request();
+    request["command"] = json!("asset_start");
+    request["display"] = json!(true);
+    app.ok(request);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !fixture.path("heic-pin.checked").is_file() {
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    app.ok(json!({"command":"heic_pin_start","owner":"101"}));
+    // Give the competing operation time to finish if it is not serialized.
+    std::thread::sleep(Duration::from_millis(300));
+    fixture.write("heic-pin.release", b"ready");
+    let result = app.ok(json!({"command":"asset_finish"}));
+    let rendition = PathBuf::from(result.as_str().unwrap());
+    app.ok(json!({"command":"vault_prepare_finish","id":"heic-pin"}));
+    assert!(
+        !rendition.with_extension("pin").exists(),
+        "A completed unpin must not be undone by late rendition publication"
+    );
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+    assert!(!rendition.exists());
+}
+
+#[test]
+fn heic_pin_markers_do_not_survive_canceled_rendition_publication() {
+    let (fixture, mut app) = heic_fixture();
+    let mut original = heic_request();
+    original["command"] = json!("asset_read");
+    let source = app.ok(original);
+    let source = PathBuf::from(source["path"].as_str().unwrap());
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":true}));
+    app.ok(json!({"command":"heic_pin_gate"}));
+    let mut request = heic_request();
+    request["command"] = json!("asset_start");
+    request["display"] = json!(true);
+    request["requestId"] = json!("heic-publish-cancel");
+    app.ok(request);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !fixture.path("heic-pin.checked").is_file() {
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    app.ok(json!({"command":"asset_cancel","owner":"101","requestId":"heic-publish-cancel"}));
+    fixture.write("heic-pin.release", b"ready");
+    assert!(app
+        .failure(json!({"command":"asset_finish"}))
+        .contains("CANCELLED"));
+    let pins: Vec<_> = std::fs::read_dir(source.parent().unwrap())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "pin"))
+        .collect();
+    assert_eq!(
+        pins,
+        vec![source.with_extension("pin")],
+        "A failed rendition must leave no orphan pin marker"
+    );
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":false}));
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+}
