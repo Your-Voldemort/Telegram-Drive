@@ -398,8 +398,12 @@ pub fn available_bytes(directory: &Path) -> Result<u64> {
     let path = directory.canonicalize().map_err(|e| e.to_string())?;
     sysinfo::Disks::new_with_refreshed_list()
         .iter()
-        .filter(|disk| path.starts_with(disk.mount_point()))
-        .max_by_key(|disk| disk.mount_point().as_os_str().len())
-        .map(|disk| disk.available_space())
+        .filter_map(|disk| {
+            let mount = disk.mount_point().canonicalize().ok()?;
+            path.starts_with(&mount)
+                .then(|| (mount.as_os_str().len(), disk.available_space()))
+        })
+        .max_by_key(|(length, _)| *length)
+        .map(|(_, available)| available)
         .ok_or_else(|| "Unable to read available device storage".into())
 }

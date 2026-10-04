@@ -22,6 +22,7 @@
 - Offline packs, gallery/slideshow navigation, archive previews, preview-cache controls and transfer activity preserve source identity and account isolation. Protected files do not produce plaintext HEIC renditions.
 - Sign-out revokes the Telegram session before removing it locally and explains remote revocation failures. Wrong two-step verification passwords can be corrected without restarting sign-in.
 - Local servers recover from occupied ports. Redacted diagnostics identify startup failures, and staged files use private directories with cleanup at startup.
+- Storage checks correctly detect available space on Windows.
 - Tray menus, transfer notifications, share-password pages, settings, authentication, encryption, Help and viewer controls use localized copy. Language changes preserve dialog and application state; accessibility improvements cover focus, labels and contrast.
 
 ### Verify downloads

@@ -3808,6 +3808,30 @@ fn cancellation_during_asset_lookup_is_registered_and_cannot_publish_a_later_res
 }
 
 #[test]
+fn canonical_cache_root_publishes_reuses_and_clears_a_native_preview() {
+    let fixture = Fixture::new();
+    let root = fixture.0.canonicalize().unwrap();
+    let mut app = Backend::start(&root);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let request = json!({
+        "command": "native_preview_prepare", "filename": "canonical.bin",
+        "size": 1024, "limit": 4096,
+    });
+    let prepared = app.ok(request.clone());
+    let partial = PathBuf::from(prepared["partial"].as_str().unwrap());
+    assert!(partial.starts_with(&root));
+    std::fs::write(&partial, vec![7; 1024]).unwrap();
+    let published = app.ok(json!({"command":"native_preview_finish"}));
+    let cached = app.ok(request);
+    assert_eq!(cached["cached"], published);
+    let path = PathBuf::from(published.as_str().unwrap());
+    assert_eq!(std::fs::read(&path).unwrap(), vec![7; 1024]);
+    app.ok(json!({"command":"native_preview_clear"}));
+    assert!(!path.exists());
+    app.stop();
+}
+
+#[test]
 fn native_and_async_preview_writers_share_capacity_and_clear_generations() {
     let fixture = Fixture::new();
     fixture.write("cross-adapter.bin", vec![7; 10_000]);
