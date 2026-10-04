@@ -401,8 +401,19 @@ test('release preflight checks local inputs and exactly one read-only health req
     const previous = health; health = { ...health, ...mutation };
     assert.notEqual((await invoke('--service-url', url)).status, 0); health = previous;
   }
+  const draft = fixture(t);
+  for (const name of ['app/package.json', 'app/package-lock.json', 'app/src-tauri/Cargo.toml',
+    'app/src-tauri/Cargo.lock', 'app/src-tauri/tauri.conf.json', 'scripts/release-preflight.cjs']) {
+    const destination = path.join(draft, name);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(path.join(root, name), destination);
+  }
+  fs.writeFileSync(path.join(draft, 'CHANGELOG.md'), '## [Unreleased]\n\nExplicit draft fixture.\n');
   const strict = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(scripts, 'release-preflight.cjs'), '--skip-network'], { cwd: root });
+    const child = spawn(process.execPath, [path.join(draft, 'scripts/release-preflight.cjs'), '--skip-network'], {
+      cwd: draft, env: { ...process.env, SUPPORTER_SERVICE_URL: '', TELEGRAM_DRIVE_SUPPORTER_SERVICE_URL: '',
+        SUPPORTER_PUBLIC_KEY: '', TELEGRAM_DRIVE_SUPPORTER_PUBLIC_KEY: '' }
+    });
     let stderr = ''; child.stderr.on('data', data => { stderr += data; });
     child.on('error', reject); child.on('close', status => resolve({ status, stderr }));
   });

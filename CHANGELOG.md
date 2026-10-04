@@ -1,187 +1,40 @@
-## [Unreleased]
+## [4.0.0] - 2026-10-04
 
-- Reuse verified digests for unchanged desktop files on eligible filesystems, across restart. Rehash changed identities before opening, preserve account and protection checks, and invalidate reuse on sign-out and Clear cache. Unsupported metadata retains full hashing.
+### Highlights
 
-- Recognize numbered FFmpeg release banners with vendor suffixes and the lowercase `n` release prefix for desktop HEIC/HEIF previews. Keep the 8.1 minimum and refuse unversioned master builds without a capability claim; original-file actions remain available.
+- Search your Telegram library with account-scoped full-text filters, collections, saved searches and a media timeline.
+- Browse HEIC/HEIF photos and offline copies while preserving the original files. macOS previews are built in; Windows and Linux require FFmpeg 8.1 or newer.
+- Reopen unchanged app-produced files instantly on eligible filesystems, including after a restart. Files with changed or unsupported identities are verified in full.
+- Keep transfers, folder listings, local services and sign-in responsive, with clearer recovery and localized navigation across 24 languages.
 
-- Translate authentication, encryption, desktop supporter recovery hints, onboarding, Help, shortcuts, privacy destinations and theme/settings arrays across all 24 catalogs. Finish copied-English translations in eleven large locales and ratchet only the two approved locale ceilings to the measured encoded sizes. Mobile follow-up changes remain local under the owner hook, and native language review remains required.
+### Compatibility and visible changes
 
-- Display plain desktop HEIC/HEIF photos through separate, bounded JPEG renditions, including offline copies, gallery/slideshow and thumbnail fallback. Try macOS sips before user-installed FFmpeg 8.1+, preserve original-file actions, and show translated recovery text when no compatible decoder is available.
+- **REST API changes for scripts:** timestamps use RFC 3339, identifiers support 64-bit values, listings include complete results and explicit partial coverage, and the API publishes an OpenAPI document. Update clients that depend on the older shapes.
+- **Open externally** permits only files the app produced or recorded plain caches from earlier releases. Account and protection checks remain active. Arbitrary paths, symlinks and modified contents are refused; recorded 3.9.x previews, thumbnails and ready offline copies remain available after upgrade.
+- **Sponsor placements return every 15 minutes.** Active and offline-grace supporter entitlements continue to suppress every sponsor advertisement.
+- **TDENC2 encryption is a frozen-format beta.** Passphrases use masked dialogs, and recovery drills verify bundles without replacing the active vault. Independent cryptographic review remains pending.
+- Every Telegram Drive feature is available to non-paying users. Supported desktop and Android builds offer an optional **$5.00 USD Lifetime Ad-Free Supporter License** that removes sponsor placements on up to three supported Windows, macOS, Linux, or Android devices in total after one verified PayPal payment. It is a one-time purchase, **not a subscription**. Normal app updates preserve activation; existing purchasers do not need to buy again, and recovery codes remain supported.
+- **Android and Google TV are not part of this release.** Desktop 4.0.0 and the Android/Google TV 4.1.0 preview use independent version lines.
 
-- Restore external opening for exact, account-recorded plain preview, thumbnail and offline cache files made by 3.9.x. Lazy registration retains content hashing, account isolation and substitution checks; user-chosen download folders are excluded.
+### Workspace, reliability and localization
 
-- Keep rehearsal tags as prereleases off latest, reuse paginated draft releases and await publication. Add packaged frontend/native startup readiness checks, artifact attestation verification and explicit workflow permissions; retain scheduled expiry and conditional signing. Collect owner-run release acceptance and local Android binary-only steps.
+- Folder, REST and WebDAV views share account-scoped inventory, retain older cached entries in partial listings and refresh after local changes. Search applies type, size, date, folder, tag, collection, favorite and protection filters before paging.
+- Offline packs, gallery/slideshow navigation, archive previews, preview-cache controls and transfer activity preserve source identity and account isolation. Protected files do not produce plaintext HEIC renditions.
+- Sign-out revokes the Telegram session before removing it locally and explains remote revocation failures. Wrong two-step verification passwords can be corrected without restarting sign-in.
+- Local servers recover from occupied ports. Redacted diagnostics identify startup failures, and staged files use private directories with cleanup at startup.
+- Tray menus, transfer notifications, share-password pages, settings, authentication, encryption, Help and viewer controls use localized copy. Language changes preserve dialog and application state; accessibility improvements cover focus, labels and contrast.
 
-- Bundle donation badges locally, recognize authenticated RPC errors as working proxy transport, reuse retained inventory for complete/partial storage insights, and generate new transfer IDs as UUIDs. Restrict external URLs and desktop file opening to app-produced files with account/identity verification; preserve sponsor and Android opening behavior.
+### Verify downloads
 
-- Add a read-only release preflight for version/build inputs, 30-day baseline margin, policy/security/Android guards and supporter health compatibility, plus artifact-provenance verification instructions.
+Download the installer and `SHA256SUMS.txt` from this release. On Linux use `sha256sum -c SHA256SUMS.txt`; on macOS use `shasum -a 256` for the selected file; on Windows use `Get-FileHash -Algorithm SHA256` and compare the matching manifest entry.
 
-- Freeze TDENC2 version 2 as beta with historical/current envelope fixtures, corruption journeys and a recovery drill. Move vault and per-file Argon2 work to bounded blocking workers; fence canceled/stale commits and require the current vault passphrase for changes.
+Verify provenance with the expected repository and inspect the reported workflow and tag:
 
-- Restore the Google TV sponsor offer label in every locale and start the desktop sponsor fallback deadline as soon as the placement is visible.
-- Correct folder inventory and search request costs, retain newest partial listings above 50,000 files, preserve listing generations across unchanged searches, and distinguish message counters from file changes.
-- Keep peer caches readable during targeted dialog discovery and ignore malformed descending HTTP byte ranges.
-- Add a native readability gate and verify FTS5 support during application builds.
+```sh
+gh attestation verify ./DOWNLOADED_ARTIFACT --repo caamer20/Telegram-Drive
+```
 
-- Ratchet measured bundle ceilings to 513,000 initial JavaScript bytes, 302,000 desktop-route bytes and 159,000 Settings-feature bytes. The current pass measures 504,751, 300,521 and 149,734 bytes respectively. Separate English/dictionary startup data is 84,352 bytes; locale totals remain fully counted.
-
-- Localize desktop tray, transfer notifications and share password pages across all 24 languages; retain account isolation, receipt deduplication, notification privacy and share authentication. Recheck notification/filename preferences immediately before delivery and preserve newer tray/receipt state during concurrent transitions.
-- Localize protection and local-access safety explanations and upload storage choice; preserve child-dialog and parent-dialog focus restoration. Remove additional verified-unused locale keys, consolidate byte-identical labels and lower literal/copied-English baselines. The approved locale-only expansion and remaining noncritical extraction are documented in `Docs/LOCALIZATION_BUDGET_REVIEW.md`; native language review remains outstanding.
-
-- Localize desktop tray menus and transfer notifications from the canonical catalogs, preserve read-only startup language preferences and synchronize native language after successful frontend loading. Prevent queued notifications from being stranded during aggregation handoff.
-
-- Serve the local share-password form from the canonical 24-language catalogs, honor language priorities and aliases, and preserve the selected language through password verification.
-
-- Localize the vault recovery drill, safety notices, file favorites, pin actions and link-generation status across all 24 catalogs; preserve verification-only recovery and account-scoped file actions.
-
-Work towards 4.0.0. Rename this heading to the release version when tagging; the release check refuses a tag while it reads "Unreleased".
-
-### Sponsor placement
-
-- Added a desktop option for a separate ad-only loopback origin while preserving the current origin as the default pending WebView acceptance.
-- Verified active and offline-grace supporter access now also suppresses ad-page and loader responses in the backend, including responses already in flight.
-- Localized sponsor loading/countdown and Android/TV sponsor labels, refreshed the fallback browser user agent, and kept the existing loader, sandbox, external links and 15-minute return interval.
-
-### Localization
-
-- Shipped language catalogs now share a lossless key table, preserving all translated values while reducing repeated data. Bundle checks count the dictionary and verify every packed value against the canonical source catalogs.
-- A bounded, translated loading screen now prepares complete local language resources before mounting the app, with reload recovery for unavailable or malformed files. The existing supporter loading gate remains intact.
-- Language and text direction change only after the selected catalog loads successfully; malformed production catalogs keep the current language usable and can be retried through Settings.
-- The mobile supporter card now uses the existing translated price, lifetime entitlement, device allowance, consent, restoration and refund copy, including status and toast messages. Purchase and restoration conditions are unchanged.
-- Locale validation now requires each language's plural forms and checks their interpolation and copied-English debt. Added missing plural forms and translated copied-English common, WebDAV, theme and connection labels; native review is tracked in `Docs/LOCALIZATION_REVIEW.md`.
-
-- Startup steps, update phases, release notes and crash recovery now use reactive translated copy. Startup retains stage identifiers so a language change cannot leave saved English progress text.
-
-- Viewer navigation, keyboard hints, progress and error labels now use shared translated catalog keys across image, PDF, archive and media surfaces.
-
-- File deletion, move/download counts and sharing outcomes now use translated catalog copy without changing native actions or account guards.
-
-- Transfer confirmations, queue-restoration outcomes and pause/resume/cancel notifications now use translated messages and complete destination/count summaries.
-
-### Accessibility
-
-- Encryption switches expose their current state, passphrase visibility buttons have localized names, and Settings fields and transfer headings have accessible labels and structure.
-- Improved text contrast in Settings and encryption states. The dashboard avoids nested main landmarks and interactive file/folder containers with nested controls.
-- TV directional navigation can reach controls below the scroll area and preserves native text, number and select keyboard behavior.
-
-### Encryption
-
-- Importing a recovery bundle no longer replaces a different vault key without an explicit second confirmation, keeps the vault passphrase you already use, and archives the replaced vault file beside the new one.
-- A recovery drill now verifies the bundle against the unlocked vault without changing anything, and its completion is tied to the vault it was run against.
-- Encryption passphrases are entered in a masked in-app dialog, once per batch, instead of an unmasked system prompt per file.
-
-### Accounts and sign-in
-
-- Signing out revokes the Telegram session before the local session is removed, and says so when Telegram could not confirm it.
-- A wrong two-step verification password can be corrected and retried without restarting sign-in.
-- Folder groups, folder order and folder names are kept per account. Another account's folder scan can no longer remove them, and they are not shown in another account's session.
-- Folder scanning builds a replacement peer cache without blocking existing file operations during dialog enumeration or legacy-folder lookups; failed scans keep the previous cache, and results from a signed-out account are rejected.
-- Folder create, rename and delete fail when the app is not connected instead of appearing to succeed.
-
-### Folder inventory and WebDAV
-
-- Folder, REST and WebDAV listings share an account/session-scoped inventory. The first read bootstraps history; later reads catch up newer message IDs and periodically verify existing files for edits and deletions made outside the app. Durable records contain identifiers only, including for protected files; the SQLite schema is unchanged. Folder Sync continues to reconcile directly with Telegram.
-- Recently accessed folders catch up every 30 seconds. A rotating audit shares at most 25 lookup batches per rolling minute across the retained account inventory: 100,000 rows, 1,000 rounded lookup batches and 1,024 folder metadata entries. A healthy sweep starts within four minutes and has a nominal 40-minute request allowance plus scheduling and request time; failures and FLOOD waits suspend that bound. Idle folders use one cold walk on their next read; oversized folders remain usable with newest partial results.
-- Inventory jobs continue independently of individual callers, with a nine-minute reconciliation deadline and a one-minute request wait. The desktop retains its rows and loading state while retrying a continuing build. Account changes cancel old work, and local mutations or vault locks reject stale publication.
-- WebDAV retries transient part-upload failures from a reopened staging file, bounds backoff, and maps remote permission, missing-file and transport failures to 403, 404 and 502. Message publication is attempted once because a lost Telegram reply cannot safely be retried with a new message identifier.
-
-### Desktop reliability
-
-- A start-up failure shows a dialog with the reason and the log location instead of exiting silently.
-- A redacted, size-limited log file records warnings and errors; the diagnostics report includes its location.
-- The local media server falls back to another port when its preferred port is in use, and previews, sponsor placements and share links follow the port in use.
-- Helper processes no longer flash console windows on Windows.
-- Staged files live in a private per-user directory that is swept at start-up.
-- Update checks repeat every six hours and when the window regains focus, honour the automatic-update setting, and have a second update endpoint.
-
-### Search
-
-- Global search uses a private, memory-only SQLite FTS5 index of verified Telegram Drive folders and Saved Messages, with type, size, date, folder, tag, collection, favorite and protection filters before paging. Saved searches reuse those rules. Word prefixes ignore accents; short, punctuation and CJK queries also support literal filename matching. Folder-view fuzzy matching remains available.
-- Search replies identify their generation and show complete or partial inventory coverage and offline status. Account, vault, metadata and external inventory changes reject stale pages and withdraw pending results. Protected filenames stay transient; the persistent database schema is unchanged. Offline search uses only previously verified Drive folder IDs and redacted stored metadata.
-- Indexes are limited to 100,000 rows and 32 MiB of retained metadata, with three build jobs and at most four cached scopes. Live search results retain organization records and can open plain media without first storing its filename. Preparing an offline pack first scans selected folders whose metadata is missing.
-
-### Previews and thumbnails
-
-- Desktop, workspace and REST thumbnails use one source-bound pipeline, with opaque per-account disk keys and a shared native/desktop byte budget. Existing pinned previews and offline-pack filenames are preserved; pinned bytes are outside disposable-cache eviction. Preview and thumbnail requests for a message serialize source identity, and canceled SQLite writes cannot replace a completed cache entry.
-- Video cards prefer Telegram thumbnails. When none is available, an installed FFmpeg can extract one bounded frame from supported MP4/MOV, WebM/Matroska or AVI sources up to 16 MiB. Three decoding jobs run at once, with 64 MiB image allocation and 480×360 JPEG output limits; cancellation, cache clearing and the 20-second extraction deadline reap child processes and remove unpublished files.
-- The desktop memory cache estimates decoded image bytes, caps retained previews/thumbnails at 128 MiB, and discards responses after account/source changes. Switching accounts closes any displayed preview before the next paint.
-
-### Workspace and archive previews
-
-- Workspace operations reuse exclusive account-specific SQLite connection leases and initialize the existing schema only for new databases. Future schema versions are refused, including on a reused connection.
-- Workspace read, mutation and indexing replies use consistent pages of at most 512 files. Cursors expire after 30 seconds idle or five minutes total; at most eight read snapshots remain open. Deletion history is matched by its indexed record key. The frontend still assembles pages for complete library views.
-- The shares database uses WAL and a five-second busy timeout, allowing reads while another connection writes.
-- Archive previews stage compressed bytes on private disk instead of buffering entire archives. ZIP and 7z entry extraction streams into private files with entry/count/total/ratio limits; RAR uses native file extraction. Transport errors, ZIP CRC failures, truncation and unpublished-operation cancellation discard temporary files.
-
-### Streaming and downloads
-
-- Byte-range requests support suffix and open-ended ranges, return `416` with the resource size when no bytes can be selected, and preserve exact offsets across Telegram CDN boundaries.
-- Download filenames carry a safe ASCII fallback and a UTF-8 `filename*` value; quotes, path separators and control characters can no longer break response headers.
-- Interrupted sources and premature end-of-file abort the HTTP body so players and download clients can detect an incomplete transfer.
-- Media seeks reuse a small, expiring message and peer snapshot cache bound to the current account session. Concurrent seeks share one resolution; account changes invalidate it. Account validation still runs for each request.
-- Protected streaming authenticates records as they arrive with memory bounded by record size instead of buffering and cutting each response off at 4 MiB. Full-file responses use `200`; byte ranges use `206`. Full reads verify the final digest before releasing the last record. An account switch, vault lock or expired credential stops a response in progress.
-
-### Bandwidth controls
-
-- The weekly quota is configurable in network settings and preserves the saved allowance. Successful declared uploads and downloads count together; in-memory reservations use unique ownership, release on failure/cancellation, survive week changes without refunding unrelated usage, and disappear after an interrupted process restarts. Corrupt accounting and backward week clocks block new admission rather than resetting usage.
-- Downloads respect their aggregate limit with VPN mode off. Upload throttling and local weekday/time windows remain off by default behind `bandwidth_schedule`; overnight windows belong to their starting day, a pause takes precedence, and overlapping limits use the lowest nonzero rate. Concurrent transfers share one allowance per direction, and canceled waits release their queue position.
-- Network configuration is validated and saved before runtime publication. Failed proxy changes restore the prior stored credential when possible and report restoration failures. Weekly quota and schedule controls have translations in all 24 catalogs; native-language review remains required.
-
-### Transfers and Folder Sync
-
-- Interrupted downloads resume from the last received chunk; connection failures retry with increasing waits; removed transfers are forgotten after 30 days.
-- Uploads larger than 10 MB continue where they stopped after a dropped connection, a pause, or a restart, including protected uploads, which continue the same envelope. An upload starts over if the file changed or Telegram no longer holds the parts already sent.
-- Folder Sync stops within a bounded time on exit or sign-out and cancels the transfer in progress.
-- Folder Sync runs its uploads and downloads through the transfer queue: they share its limits and retries, show their progress in Transfers, and can be paused or cancelled there. They do not raise transfer notifications.
-- Sync no longer treats encrypted envelopes or photos as files named `TDENC2` or `Photo.jpg`, and finishes an upload that was interrupted before it was recorded instead of downloading it again. Each upload is recorded as soon as it completes.
-- A protected file uploaded by Folder Sync keeps its path inside its encrypted metadata. After a reinstall, on a new device, or when a mapping is removed and added again, sync places such files by that path with the vault unlocked instead of uploading them a second time. Protected files uploaded by earlier releases carry no path and are left alone as before.
-- Settings → Folder Sync has two new options: skip unchanged files when scanning (off by default), and, per mapping, treat same-size files that already exist in both places as synced.
-
-### Local REST API
-
-- List, search, statistics, duplicates and empty folders cover each folder's whole history. They previously read only the newest 100–200 messages per folder.
-- `/files/search` now answers; it previously returned `404`.
-- `created_at` is RFC 3339 (`2026-06-05T10:00:00Z`) instead of `2026-06-05 10:00:00 UTC`. Filters accept both forms.
-- File objects carry `encrypted`; list and statistics responses carry `complete`.
-- Every endpoint is bound to the signed-in account, the key is checked before input is parsed, out-of-range file identifiers are refused instead of truncated, and an incomplete Telegram listing returns `502` instead of a shorter list.
-- Bulk archives are written to disk as they download instead of being held in memory.
-- An OpenAPI 3.1 contract is served at `/api/v1/openapi.json`.
-
-### Bundle budgets
-
-- Desktop-route and Settings, media-player and PDF chunk budgets are mandatory; removing or invalidating their configured ceilings now fails verification.
-- The production build measured on 2026-10-01 with Node 22 recorded the following uncompressed sizes. Existing ceilings are unchanged; this pass introduced no frontend size reduction to ratchet down.
-
-| Asset group | Measured bytes | Ceiling bytes |
-| --- | ---: | ---: |
-| Initial JavaScript | 541,888 | 550,000 |
-| Total JavaScript | 2,488,561 | 3,300,000 |
-| Desktop route, excluding initial JavaScript | 306,548 | 310,000 |
-| Settings chunk | 146,002 | 160,000 |
-| Media-player chunk | 248,426 | 250,000 |
-| PDF-viewer chunk | 503,518 | 510,000 |
-| Archive-viewer chunk | 17,316 | 25,000 |
-| HLS chunk | 523,075 | 540,000 |
-| Total CSS | 131,076 | 140,000 |
-| Total locale data | 1,788,099 | 1,800,000 |
-| Largest locale catalog | 122,958 | 125,000 |
-
-### Security and dependencies
-
-- Updated front-end dependencies, including PDF.js 6, and cleared the npm advisory allowlist. The PDF viewer bundle ceiling was raised from 500 kB to 510 kB for it.
-- Dependency baselines carry expiry dates that a scheduled check watches.
-- Node 22 and Rust 1.92.0 are pinned in every workflow.
-
-### Release engineering
-
-- The release workflow signs and notarizes macOS builds and signs Windows builds when signing credentials are configured, and verifies the result. Without credentials, builds are unchanged. See `Docs/CODE_SIGNING.md`.
-- A publication guard refuses Android project files in tracked files and outgoing commits.
-- New end-to-end journeys cover vault recovery, per-account folders, sync planning, transfer retry, logging, staging, the REST and WebDAV servers over HTTP, the sponsor placement, PDF preview, update checks, and verification of a Worker-issued supporter entitlement by the application.
-
-### Compatibility
-
-- The $5.00 USD one-time lifetime ad-free license, existing activations, recovery codes, the three-device allowance, the entitlement token format, the signing key and the stored credential identifiers are unchanged. Sponsor placements are unchanged apart from following the media server's port.
-- REST clients that parse `created_at` must accept RFC 3339.
+Do not install if verification fails or identifies an unexpected producer. Source and Arch runtime SBOMs and Sigstore bundles accompany the release. See [download verification](Docs/RELEASE_NOTES_TEMPLATE.md).
 
 ## [3.9.8] - 2026-09-29
 
