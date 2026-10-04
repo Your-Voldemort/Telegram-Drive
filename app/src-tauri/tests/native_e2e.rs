@@ -48,7 +48,10 @@ struct Backend {
     child: Child,
     input: ChildStdin,
     replies: Receiver<Value>,
+    heic_pending: bool,
 }
+// Child readiness is setup, before any application journey clock.
+const NATIVE_FIXTURE_STARTUP: Duration = Duration::from_secs(120);
 impl Backend {
     fn start(root: &Path) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_native-e2e-driver"))
@@ -75,11 +78,12 @@ impl Backend {
             child,
             input,
             replies,
+            heic_pending: false,
         };
         assert_eq!(
             instance
                 .replies
-                .recv_timeout(Duration::from_secs(30))
+                .recv_timeout(NATIVE_FIXTURE_STARTUP)
                 .expect("native process did not start"),
             json!({"ready":true})
         );
@@ -89,6 +93,23 @@ impl Backend {
         self.request_before(request, Duration::from_secs(60))
     }
     fn request_before(&mut self, request: Value, deadline: Duration) -> Value {
+        let command = request["command"].as_str().unwrap_or("");
+        let heic = matches!(request["mime"].as_str(), Some("image/heic" | "image/heif"))
+            || command == "asset_display_local"
+            || (command == "asset_finish" && self.heic_pending);
+        if command == "asset_start" && heic && request["display"] == true {
+            self.heic_pending = true;
+        }
+        if command == "asset_finish" {
+            self.heic_pending = false;
+        }
+        // Covers controlled probe, conversion readiness and the explicit fixture clock.
+        // Explicit caller timeouts and every non-HEIC journey keep their existing bounds.
+        let deadline = if heic && deadline == Duration::from_secs(60) {
+            Duration::from_secs(480)
+        } else {
+            deadline
+        };
         writeln!(self.input, "{request}").unwrap();
         self.input.flush().unwrap();
         self.replies.recv_timeout(deadline).unwrap_or_else(|error| {
@@ -3812,6 +3833,7 @@ fn ffmpeg_helper_name() -> &'static str {
     }
 }
 
+const VIDEO_FIXTURE_READINESS: Duration = Duration::from_secs(300);
 fn thumbnail_video_fixture(fixture: &Fixture, mode: &str) {
     fixture.write("video.bin", b"controlled video boundary");
     fixture.write("ffmpeg-mode", mode);
@@ -3819,7 +3841,7 @@ fn thumbnail_video_fixture(fixture: &Fixture, mode: &str) {
         .save(fixture.path("ffmpeg-frame.jpg"))
         .unwrap();
     std::fs::copy(
-        env!("CARGO_BIN_EXE_native-e2e-driver"),
+        env!("CARGO_BIN_EXE_native-e2e-heic-helper"),
         fixture.path(ffmpeg_helper_name()),
     )
     .unwrap();
@@ -3892,8 +3914,8 @@ fn clearing_thumbnails_waits_for_blocking_child_cleanup_and_preserves_next_reque
     thumbnail_video_fixture(&fixture, "wait");
     let mut app = Backend::start(&fixture.0);
     app.ok(json!({"command":"seed_account","owner":101}));
-    app.ok(json!({"command":"asset_start","owner":"101","source":"video.bin","thumbnail":true,"video":true,"ffmpeg":ffmpeg_helper_name()}));
-    let deadline = Instant::now() + Duration::from_secs(15);
+    app.ok(json!({"command":"asset_start","owner":"101","source":"video.bin","thumbnail":true,"video":true,"ffmpeg":ffmpeg_helper_name(),"fixtureVideoClock":true}));
+    let deadline = Instant::now() + VIDEO_FIXTURE_READINESS;
     while !fixture.path("ffmpeg-pid").exists() {
         assert!(Instant::now() < deadline);
         std::thread::sleep(Duration::from_millis(10));
@@ -3939,12 +3961,13 @@ fn live_frame_partials_are_counted_once_when_another_thumbnail_is_admitted() {
             .unwrap()
             .len();
     app.ok(json!({"command":"asset_limits","previews":1_000_000,"thumbnails":limit}));
-    app.ok(json!({"command":"asset_start","owner":"101","source":"video.bin","thumbnail":true,"video":true,"ffmpeg":ffmpeg_helper_name()}));
-    let deadline = Instant::now() + Duration::from_secs(15);
+    app.ok(json!({"command":"asset_start","owner":"101","source":"video.bin","thumbnail":true,"video":true,"ffmpeg":ffmpeg_helper_name(),"fixtureVideoClock":true}));
+    let deadline = Instant::now() + VIDEO_FIXTURE_READINESS;
     while !fixture.path("ffmpeg-frame-ready").exists() {
         assert!(Instant::now() < deadline);
         std::thread::sleep(Duration::from_millis(10));
     }
+    assert_video_fixture_child_alive(&fixture);
     let second = app.ok(json!(
         {
             "command":"asset_read",
@@ -3958,11 +3981,97 @@ fn live_frame_partials_are_counted_once_when_another_thumbnail_is_admitted() {
         }
     ));
     assert!(Path::new(second["path"].as_str().unwrap()).is_file());
+    assert_video_fixture_child_alive(&fixture);
     app.ok(json!({"command":"asset_clear","owner":"101","category":"thumbnails"}));
     assert!(app
         .failure(json!({"command":"asset_finish"}))
         .contains("CANCELLED"));
     app.stop();
+}
+
+fn assert_video_fixture_child_alive(fixture: &Fixture) {
+    let pid = std::fs::read_to_string(fixture.path("ffmpeg-pid")).unwrap();
+    #[cfg(unix)]
+    assert!(
+        Command::new("kill")
+            .args(["-0", pid.trim()])
+            .stderr(Stdio::null())
+            .status()
+            .unwrap()
+            .success(),
+        "controlled extraction child is no longer alive"
+    );
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::{
+            Foundation::CloseHandle,
+            System::Threading::{
+                GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+            },
+        };
+        let handle = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION,
+            0,
+            pid.trim().parse().unwrap(),
+        );
+        assert!(!handle.is_null());
+        let mut code = 0;
+        let alive = GetExitCodeProcess(handle, &mut code) != 0 && code == 259;
+        CloseHandle(handle);
+        assert!(alive, "controlled extraction child is no longer alive");
+    }
+}
+#[test]
+fn delayed_video_fixture_reaches_a_live_partial_before_cancellation() {
+    let fixture = Fixture::new();
+    thumbnail_video_fixture(&fixture, "frame-wait");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let started = Instant::now();
+    app.ok(json!({
+        "command":"asset_start", "owner":"101", "source":"video.bin",
+        "thumbnail":true, "video":true, "ffmpeg":ffmpeg_helper_name(),
+        "fixtureVideoClock":true, "fixtureVideoReadyDelayMs":21_000
+    }));
+    let deadline = Instant::now() + VIDEO_FIXTURE_READINESS;
+    while !fixture.path("ffmpeg-frame-ready").exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let reached = fixture.path("ffmpeg-frame-ready").is_file();
+    let elapsed = started.elapsed();
+    if reached {
+        assert_video_fixture_child_alive(&fixture);
+    }
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"thumbnails"}));
+    let stopped = app.failure(json!({"command":"asset_finish"}));
+    assert!(stopped.contains("CANCELLED"), "{stopped}");
+    assert!(reached, "delayed fixture did not reach its partial stage");
+    assert!(
+        elapsed >= Duration::from_secs(21),
+        "controlled readiness delay was not exercised: {elapsed:?}"
+    );
+    assert_eq!(
+        std::fs::read_dir(fixture.path("asset-cache/previews/workspace/101/thumbnails"))
+            .unwrap()
+            .count(),
+        0
+    );
+    #[cfg(unix)]
+    {
+        let pid = std::fs::read_to_string(fixture.path("ffmpeg-pid")).unwrap();
+        assert!(
+            !Command::new("kill")
+                .args(["-0", pid.trim()])
+                .stderr(Stdio::null())
+                .status()
+                .unwrap()
+                .success(),
+            "delayed extraction child survived clear"
+        );
+    }
+    fixture.write("ffmpeg-mode", "ok");
+    let next = app.ok(json!({"command":"asset_read","owner":"101","source":"video.bin","thumbnail":true,"video":true,"ffmpeg":ffmpeg_helper_name()}));
+    assert!(Path::new(next["path"].as_str().unwrap()).is_file());
 }
 
 #[test]
@@ -6522,19 +6631,31 @@ fn release_global_search_over_the_row_bound_returns_partial_and_folder_discovery
     let mut app = Backend::start(&fixture.0);
     app.ok(json!({"command":"seed_account","owner":101}));
     let query = json!({"command":"search_inventory","owner":"101","source":"large-search.json","folders":[1,2,3],"query":{"query":"Report","limit":10}});
-    let first = app.ok(query.clone());
+    // These bulk fixture requests build up to the retained-row cap under load.
+    // Completeness, counts and generation assertions below remain unchanged.
+    const BULK_SEARCH_FIXTURE_WAIT: Duration = Duration::from_secs(300);
+    let mut read = |query: Value, phase: &str| {
+        let started = Instant::now();
+        let result = app.ok_before(query, BULK_SEARCH_FIXTURE_WAIT);
+        println!(
+            "bulk search fixture phase={phase}; wallSeconds={}",
+            started.elapsed().as_secs_f64()
+        );
+        result
+    };
+    let first = read(query.clone(), "cold");
     assert_eq!(first["complete"], false);
     assert!(first["total"].as_u64().unwrap() >= 40000);
     assert!(first["total"].as_u64().unwrap() < 80000);
-    assert_eq!(app.ok(query.clone())["indexId"], first["indexId"]);
+    assert_eq!(read(query.clone(), "cached")["indexId"], first["indexId"]);
     let mut scoped = query.clone();
     scoped["query"]["folderKey"] = json!("3");
-    let third = app.ok(scoped);
+    let third = read(scoped, "scoped");
     assert_eq!(third["complete"], true);
     assert_eq!(third["total"], 40000);
     let mut changed = query;
     changed["folders"] = json!([3]);
-    let reply = app.ok(changed);
+    let reply = read(changed, "discovery");
     assert_ne!(reply["indexId"], first["indexId"]);
     assert_eq!(reply["complete"], true);
     assert_eq!(reply["total"], 40000);
@@ -6754,14 +6875,18 @@ fn release_maximum_retained_audit_set_rechecks_every_id_within_one_hour() {
     let mut app = Backend::start(&fixture.0);
     app.ok(json!({"command":"seed_account","owner":101}));
     // One IPC request compresses 92 virtual minutes over 100,000 rows.
-    // An isolated observation took 53.6s; 120s leaves headroom under four
-    // test threads without changing production timeouts or audit assertions.
-    const COMPRESSED_AUDIT_DEADLINE: Duration = Duration::from_secs(120);
+    // The 120s IPC wait expired under the sixteen-worker loaded full suite.
+    // Virtual-time audit bounds and every per-ID/rate assertion remain unchanged.
+    const COMPRESSED_AUDIT_DEADLINE: Duration = Duration::from_secs(300);
+    let started = Instant::now();
     let result = app.ok_before(
         json!({"command":"inventory_detection_bound","owner":"101","large":"bound-large.json","small":"bound-small.json"}),
         COMPRESSED_AUDIT_DEADLINE,
     );
-    println!("maximum retained audit detection: {result}");
+    println!(
+        "maximum retained audit detection: {result}; wallSeconds={}",
+        started.elapsed().as_secs_f64()
+    );
     assert_eq!(result["seen"], 100000);
     assert!(result["repeated"].as_u64().unwrap() >= 100000);
     assert!(result["minimumChecks"].as_u64().unwrap() >= 1);
@@ -6953,9 +7078,8 @@ fn encryption_beta_competing_changes_keep_the_winning_passphrase_and_keys() {
     app.ok(json!({"command":"vault_change_passphrase","currentPassphrase":"synthetic original passphrase","passphrase":"synthetic winning passphrase"}));
     let winning = fixture.read("crypto.vault");
     fixture.write("prepare-change.release", b"continue");
-    assert!(app
-        .failure(json!({"command":"vault_prepare_finish","id":"change"}))
-        .contains("VAULT_CHANGED"));
+    let failure = app.failure(json!({"command":"vault_prepare_finish","id":"change"}));
+    assert!(failure.contains("VAULT_CHANGED"), "{failure}");
     assert_eq!(fixture.read("crypto.vault"), winning);
     app.stop();
     let mut app = Backend::start(&fixture.0);
@@ -8094,8 +8218,8 @@ fn heic_request() -> Value {
     json!({"command":"asset_display_read","owner":"101","source":"synthetic.heic","filename":"Synthetic.heic","extension":"heic","mime":"image/heic"})
 }
 fn wait_heic_process(fixture: &Fixture) {
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while !fixture.path("heic-pid").is_file() {
+    let deadline = Instant::now() + Duration::from_secs(300);
+    while !fixture.path("heic-ready").is_file() {
         assert!(
             Instant::now() < deadline,
             "Controlled decoder did not start"
@@ -8103,6 +8227,111 @@ fn wait_heic_process(fixture: &Fixture) {
         std::thread::sleep(Duration::from_millis(10));
     }
 }
+#[test]
+fn heic_fixture_completed_exit_keeps_real_status_and_refuses_unmonitored_work() {
+    let mut results = Vec::new();
+    for mode in ["completed", "failed-exit", "active"] {
+        let (fixture, mut app) = heic_fixture();
+        let mut request = heic_request();
+        request["fixtureMonitorLoss"] = json!(if mode == "active" {
+            "before-completion"
+        } else {
+            "after-completion"
+        });
+        request["fixtureExitDelayMs"] = json!(100);
+        if mode == "failed-exit" {
+            request["fixtureExitFailure"] = json!(true);
+        }
+        if mode == "active" {
+            fixture.write("heic-mode", "wait");
+            request["fixtureDeadlineMs"] = json!(200);
+        }
+        let reply = app.request(request);
+        let status = app.ok(json!({"command":"heic_status"}));
+        app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+        results.push((mode, reply, status));
+    }
+    for (mode, reply, status) in results {
+        if mode == "active" {
+            assert!(
+                reply["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains("MEMORY_MONITOR_UNAVAILABLE"),
+                "{reply}; {status}"
+            );
+            assert!(status["decodes"].as_array().unwrap().is_empty());
+        } else {
+            let process = status["processes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|item| item["version_probe"] == false)
+                .unwrap();
+            assert_eq!(process["completed_exit_wait"], true, "{process}");
+            if mode == "completed" {
+                assert_eq!(reply["ok"], true, "{reply}; {status}");
+            } else {
+                assert!(
+                    reply["error"]
+                        .as_str()
+                        .unwrap()
+                        .contains("HEIC_DECODE_FAILED"),
+                    "{reply}; {status}"
+                );
+                assert!(status["decodes"].as_array().unwrap().is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn heic_fixture_conversion_readiness_precedes_its_deadline_and_helper_stays_small() {
+    let (fixture, mut app) = heic_fixture();
+    fixture.write("heic-mode", "wait");
+    let mut request = heic_request();
+    request["fixtureReadyDelayMs"] = json!(1200);
+    request["fixtureDeadlineMs"] = json!(200);
+    let failure = app.failure(request);
+    let status = app.ok(json!({"command":"heic_status"}));
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+    assert!(failure.contains("DEADLINE"), "{failure}; {status}");
+    assert!(
+        fixture.path("heic-ready").is_file(),
+        "Actual conversion never signaled readiness: {status}"
+    );
+    let process = status["processes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["version_probe"] == false && item["outcome"] == "HEIC_DECODE_DEADLINE")
+        .unwrap();
+    assert!(
+        process["readiness_seconds"].as_f64().unwrap() >= 1.2,
+        "{process}"
+    );
+    assert!(
+        process["clock_seconds"].as_f64().unwrap() >= 0.2,
+        "{process}"
+    );
+    let helper_size = std::fs::metadata(fixture.path(if cfg!(windows) {
+        "heic-helper.exe"
+    } else {
+        "heic-helper"
+    }))
+    .unwrap()
+    .len();
+    let driver_size = std::fs::metadata(env!("CARGO_BIN_EXE_native-e2e-driver"))
+        .unwrap()
+        .len();
+    assert!(
+        helper_size < 16 * 1024 * 1024 && helper_size < driver_size / 4,
+        "Helper: {helper_size}; driver: {driver_size}"
+    );
+    println!("HEIC readiness containment: {status}");
+    assert!(status["decodes"].as_array().unwrap().is_empty());
+}
+
 #[test]
 fn heic_version_banners_gate_the_real_asset_pipeline_and_keep_original_actions() {
     let mut failures = Vec::new();
@@ -8310,6 +8539,11 @@ fn heic_memory_threshold_terminates_a_touching_decoder_process() {
         "{failure}"
     );
     let status = app.ok(json!({"command":"heic_status"}));
+    assert_eq!(status["decoderEntered"], true, "{status}");
+    assert!(
+        fixture.path("heic-ready").is_file(),
+        "Memory process was never ready: {status}"
+    );
     #[cfg(target_os = "macos")]
     assert!(status["processes"]
         .as_array()
@@ -8414,6 +8648,9 @@ fn heic_explicit_cancellation_and_deadline_remove_partial_outputs() {
         request["command"] = json!("asset_start");
         request["display"] = json!(true);
         request["requestId"] = json!("heic-cancel");
+        if operation == "deadline" {
+            request["fixtureDeadlineMs"] = json!(2000);
+        }
         app.ok(request);
         wait_heic_process(&fixture);
         if operation == "cancel" {
@@ -8487,7 +8724,7 @@ fn heic_pin_inheritance_cannot_recreate_a_pin_after_concurrent_unpinning() {
     request["command"] = json!("asset_start");
     request["display"] = json!(true);
     app.ok(request);
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let deadline = Instant::now() + Duration::from_secs(300);
     while !fixture.path("heic-pin.checked").is_file() {
         assert!(Instant::now() < deadline);
         std::thread::sleep(Duration::from_millis(10));
@@ -8521,7 +8758,7 @@ fn heic_pin_markers_do_not_survive_canceled_rendition_publication() {
     request["display"] = json!(true);
     request["requestId"] = json!("heic-publish-cancel");
     app.ok(request);
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let deadline = Instant::now() + Duration::from_secs(300);
     while !fixture.path("heic-pin.checked").is_file() {
         assert!(Instant::now() < deadline);
         std::thread::sleep(Duration::from_millis(10));

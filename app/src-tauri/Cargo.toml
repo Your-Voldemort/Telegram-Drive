@@ -118,6 +118,13 @@ path = "test-support/native_e2e_driver.rs"
 required-features = ["native-e2e"]
 test = false
 
+# Synchronous std-only fixture; never discovered or bundled as the application.
+[[bin]]
+name = "native-e2e-heic-helper"
+path = "test-support/heic_helper.rs"
+required-features = ["native-e2e"]
+test = false
+
 [[test]]
 name = "native_e2e"
 path = "tests/native_e2e.rs"

@@ -111,7 +111,7 @@ impl CryptoState {
         let gate = gate.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some((started, release)) = gate {
             std::fs::write(&started, b"preparing")?;
-            let deadline = Instant::now() + Duration::from_secs(15);
+            let deadline = Instant::now() + Duration::from_secs(120);
             while !release.is_file() {
                 if Instant::now() >= deadline {
                     return Err(CryptoError::internal("Preparation fixture timed out"));

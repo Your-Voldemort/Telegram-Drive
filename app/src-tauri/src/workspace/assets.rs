@@ -767,9 +767,12 @@ impl TelegramAssetSource {
             Some(ThumbnailInput::Image)
         } else if thumbnail && thumbnail_size.is_none() && size <= THUMB_SOURCE_LIMIT {
             match mime.and_then(video_format) {
-                Some(format) => {
-                    executable.map(|executable| ThumbnailInput::Video { executable, format })
-                }
+                Some(format) => executable.map(|executable| ThumbnailInput::Video {
+                    executable,
+                    format,
+                    #[cfg(feature = "native-e2e")]
+                    fixture: None,
+                }),
                 None => None,
             }
         } else {
@@ -1604,6 +1607,12 @@ fn video_format(mime: &str) -> Option<&'static str> {
 }
 
 static THUMBNAIL_DECODERS: OnceLock<Arc<Semaphore>> = OnceLock::new();
+#[cfg(feature = "native-e2e")]
+#[derive(Clone)]
+pub(crate) struct VideoFixtureClock {
+    pub ready: PathBuf,
+    pub delay_ms: u64,
+}
 #[derive(Clone)]
 pub(crate) enum ThumbnailInput {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1612,6 +1621,8 @@ pub(crate) enum ThumbnailInput {
     Video {
         executable: PathBuf,
         format: &'static str,
+        #[cfg(feature = "native-e2e")]
+        fixture: Option<VideoFixtureClock>,
     },
 }
 /// The permit and all caller leases move into the blocking job. Dropping a
@@ -1674,7 +1685,12 @@ pub(crate) async fn render_thumbnail<H: Send + 'static>(
                 crate::heic::decode(&input, &temporary, &tools, (480, 360), check)?;
                 temporary.clone()
             }
-            ThumbnailInput::Video { executable, format } => {
+            ThumbnailInput::Video {
+                executable,
+                format,
+                #[cfg(feature = "native-e2e")]
+                fixture,
+            } => {
                 let mut options = std::fs::OpenOptions::new();
                 options.create_new(true).write(true);
                 #[cfg(unix)]
@@ -1736,13 +1752,38 @@ pub(crate) async fn render_thumbnail<H: Send + 'static>(
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null());
+                #[cfg(feature = "native-e2e")]
+                if let Some(clock) = &fixture {
+                    command.env("TD_E2E_VIDEO_READY", &clock.ready)
+                        .env("TD_E2E_VIDEO_READY_DELAY_MS", clock.delay_ms.to_string());
+                }
                 crate::process_util::hide_console_blocking(&mut command);
+                #[cfg(feature = "native-e2e")]
+                let spawning = std::time::Instant::now();
                 let mut child = command
                     .spawn()
                     .map_err(|_| "THUMBNAIL_UNAVAILABLE: FFmpeg unavailable")?;
                 let deadline = std::time::Instant::now() + Duration::from_secs(20);
+                #[cfg(feature = "native-e2e")]
+                let fixture_started = std::time::Instant::now();
+                #[cfg(feature = "native-e2e")]
+                let fixture_spawn_seconds = spawning.elapsed().as_secs_f64();
+                #[cfg(feature = "native-e2e")]
+                let mut fixture_ready = None;
                 loop {
-                    if check().is_err() || std::time::Instant::now() >= deadline {
+                    #[cfg(feature = "native-e2e")]
+                    let current_deadline = if let Some(clock) = &fixture {
+                        if fixture_ready.is_none() && std::fs::read_to_string(&clock.ready)
+                            .is_ok_and(|value| value == child.id().to_string()) {
+                            let ready = std::time::Instant::now();
+                            fixture_ready = Some(ready);
+                            eprintln!("Controlled video timing: spawn_seconds={fixture_spawn_seconds:.6}, readiness_seconds={:.6}", fixture_started.elapsed().as_secs_f64());
+                        }
+                        fixture_ready.unwrap_or(fixture_started) + Duration::from_secs(120)
+                    } else { deadline };
+                    #[cfg(not(feature = "native-e2e"))]
+                    let current_deadline = deadline;
+                    if check().is_err() || std::time::Instant::now() >= current_deadline {
                         let _ = child.kill();
                         let _ = child.wait();
                         return Err("CANCELLED: Thumbnail extraction stopped".into());
@@ -2272,7 +2313,7 @@ fn wait_heic_pin_gate() -> Result<(), String> {
         .take();
     if let Some((started, release)) = gate {
         std::fs::write(started, b"ready").map_err(|e| e.to_string())?;
-        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+        let deadline = std::time::Instant::now() + Duration::from_secs(120);
         while !release.is_file() {
             if std::time::Instant::now() >= deadline {
                 return Err("HEIC pin fixture deadline".into());

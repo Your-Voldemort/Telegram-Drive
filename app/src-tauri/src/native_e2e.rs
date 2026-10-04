@@ -654,6 +654,16 @@ fn fixture_asset(
         Some(crate::workspace::assets::ThumbnailInput::Video {
             executable: child(root, text(request, "ffmpeg")?)?,
             format: "mov",
+            fixture: request["fixtureVideoClock"]
+                .as_bool()
+                .unwrap_or(false)
+                .then(|| crate::workspace::assets::VideoFixtureClock {
+                    ready: root.join(format!("video-{}.ready", uuid::Uuid::new_v4())),
+                    delay_ms: request["fixtureVideoReadyDelayMs"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        .min(30_000),
+                }),
         })
     } else {
         Some(crate::workspace::assets::ThumbnailInput::Image)
@@ -4804,10 +4814,12 @@ fn heic_fixture_tools(root: &Path, request: &Value) -> Result<crate::heic::Tools
         Some("sips") => Ok(crate::heic::Tools {
             sips: Some(PathBuf::from("/usr/bin/sips")),
             ffmpeg: vec![],
+            ..Default::default()
         }),
         Some("ffmpeg") => Ok(crate::heic::Tools {
             sips: None,
             ffmpeg: vec![PathBuf::from("/usr/local/bin/ffmpeg")],
+            ..Default::default()
         }),
         Some("missing") => Ok(crate::heic::Tools::default()),
         _ => {
@@ -4818,30 +4830,91 @@ fn heic_fixture_tools(root: &Path, request: &Value) -> Result<crate::heic::Tools
             };
             let helper = root.join(name);
             if !helper.exists() {
-                // Same immutable fixture executable, avoiding a cold103MB copy/signature scan.
-                let executable = std::env::current_exe().map_err(error)?;
+                let executable =
+                    std::env::current_exe()
+                        .map_err(error)?
+                        .with_file_name(if cfg!(windows) {
+                            "native-e2e-heic-helper.exe"
+                        } else {
+                            "native-e2e-heic-helper"
+                        });
                 if std::fs::hard_link(&executable, &helper).is_err() {
                     std::fs::copy(executable, &helper).map_err(error)?;
                 }
-                // Prime the103MB fixture executable's platform signature check.
-                // Real FFmpeg probes retain the production2s deadline. This
-                // controlled helper proves lifecycle behavior, never cold startup.
-                let mut probe = std::process::Command::new(&helper);
-                probe.arg("-version");
-                let outcome = crate::process_budget::run(
-                    probe,
-                    std::time::Instant::now() + Duration::from_secs(20),
-                    true,
-                    || Ok(()),
-                    None,
-                )?;
-                if !outcome.success {
-                    return Err("Controlled helper startup failed".into());
-                }
+            }
+            // Prepare synthetic JPEG payloads outside the conversion clock. The small
+            // helper only copies them; real HEIF decoding remains a separate boundary.
+            let frame = root.join("heic-frame.jpg");
+            let bytes = if frame.is_file() {
+                std::fs::read(frame).map_err(error)?
+            } else {
+                include_bytes!("../test-support/fixtures/heic/tiled-12mp-reference.jpg").to_vec()
+            };
+            let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes))
+                .with_guessed_format()
+                .map_err(error)?
+                .into_dimensions()
+                .map_err(error)?;
+            let maximum = if request["thumbnail"].as_bool().unwrap_or(false) {
+                (480, 360)
+            } else {
+                (4096, 4096)
+            };
+            let scale = (f64::from(maximum.0) / f64::from(dimensions.0))
+                .min(f64::from(maximum.1) / f64::from(dimensions.1))
+                .min(1.0);
+            let expected = (
+                (f64::from(dimensions.0) * scale).round() as u32,
+                (f64::from(dimensions.1) * scale).round() as u32,
+            );
+            let path = root.join(format!("heic-payload-{}x{}.jpg", expected.0, expected.1));
+            let tile = std::fs::read_to_string(root.join("heic-mode"))
+                .is_ok_and(|value| value.trim() == "tile");
+            if tile {
+                let image = image::load_from_memory(&bytes).map_err(error)?;
+                image
+                    .crop_imm(0, 0, 512.min(image.width()), 512.min(image.height()))
+                    .save_with_format(root.join("heic-payload-tile.jpg"), image::ImageFormat::Jpeg)
+                    .map_err(error)?;
+            } else if expected == dimensions {
+                std::fs::write(path, &bytes).map_err(error)?;
+            } else {
+                image::load_from_memory(&bytes)
+                    .map_err(error)?
+                    .thumbnail(expected.0, expected.1)
+                    .save_with_format(path, image::ImageFormat::Jpeg)
+                    .map_err(error)?;
             }
             Ok(crate::heic::Tools {
                 sips: None,
                 ffmpeg: vec![helper],
+                fixture: Some(crate::process_budget::FixtureClock {
+                    ready: root.join(format!("heic-conversion-{}.ready", uuid::Uuid::new_v4())),
+                    delay_ms: request["fixtureReadyDelayMs"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        .min(5000),
+                    duration: Duration::from_millis(
+                        request["fixtureDeadlineMs"]
+                            .as_u64()
+                            .unwrap_or(120_000)
+                            .clamp(100, 120_000),
+                    ),
+                    monitor_loss: match request["fixtureMonitorLoss"].as_str() {
+                        Some("before-completion") => {
+                            Some(crate::process_budget::FixtureMonitorLoss::BeforeCompletion)
+                        }
+                        Some("after-completion") => {
+                            Some(crate::process_budget::FixtureMonitorLoss::AfterCompletion)
+                        }
+                        _ => None,
+                    },
+                    exit_delay_ms: request["fixtureExitDelayMs"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        .min(1000),
+                    exit_failure: request["fixtureExitFailure"].as_bool().unwrap_or(false),
+                }),
             })
         }
     }

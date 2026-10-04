@@ -20,6 +20,8 @@ pub(crate) static DECODERS: LazyLock<Arc<tokio::sync::Semaphore>> =
 pub(crate) struct Tools {
     pub sips: Option<PathBuf>,
     pub ffmpeg: Vec<PathBuf>,
+    #[cfg(feature = "native-e2e")]
+    pub fixture: Option<process_budget::FixtureClock>,
 }
 impl Tools {
     pub(crate) fn platform(resource: Option<&Path>) -> Self {
@@ -40,7 +42,12 @@ impl Tools {
             }
         }
         ffmpeg.push(PathBuf::from("ffmpeg"));
-        Self { sips, ffmpeg }
+        Self {
+            sips,
+            ffmpeg,
+            #[cfg(feature = "native-e2e")]
+            fixture: None,
+        }
     }
 }
 pub(crate) fn is_name(name: &str) -> bool {
@@ -605,6 +612,12 @@ pub(crate) fn decode(
     let _cache_partial = crate::workspace::assets::track_decoder_partial(&temporary, destination);
     drop(create(&temporary)?);
     let deadline = Instant::now() + Duration::from_secs(30);
+    #[cfg(feature = "native-e2e")]
+    let deadline = if tools.fixture.is_some() {
+        Instant::now() + Duration::from_secs(480)
+    } else {
+        deadline
+    };
     let mut attempts = Vec::new();
     if let Some(sips) = &tools.sips {
         attempts.push(("sips", sips));
@@ -619,13 +632,21 @@ pub(crate) fn decode(
         if name == "ffmpeg" {
             let mut probe = Command::new(executable);
             probe.arg("-version");
-            let probe = process_budget::run(
-                probe,
-                deadline.min(Instant::now() + Duration::from_secs(2)),
-                true,
-                &check,
-                None,
-            );
+            #[cfg(feature = "native-e2e")]
+            if let Some(clock) = &tools.fixture {
+                probe.env(
+                    "TD_E2E_COMPLETE",
+                    clock.ready.with_extension("probe-complete"),
+                );
+            }
+            let probe_deadline = deadline.min(Instant::now() + Duration::from_secs(2));
+            #[cfg(feature = "native-e2e")]
+            let probe_deadline = if tools.fixture.is_some() {
+                deadline.min(Instant::now() + Duration::from_secs(120))
+            } else {
+                probe_deadline
+            };
+            let probe = process_budget::run(probe, probe_deadline, true, &check, None);
             match probe {
                 Ok(output) if output.success && version_eligible(&output.stdout) => {}
                 Ok(_) => {
@@ -718,6 +739,19 @@ pub(crate) fn decode(
                 ])
                 .arg(&temporary);
         }
+        #[cfg(feature = "native-e2e")]
+        let output = if let Some(clock) = &tools.fixture {
+            process_budget::run_fixture(command, false, &check, Some((&temporary, cap)), clock)
+        } else {
+            process_budget::run(
+                command,
+                deadline.min(Instant::now() + Duration::from_secs(20)),
+                false,
+                &check,
+                Some((&temporary, cap)),
+            )
+        };
+        #[cfg(not(feature = "native-e2e"))]
         let output = process_budget::run(
             command,
             deadline.min(Instant::now() + Duration::from_secs(20)),
