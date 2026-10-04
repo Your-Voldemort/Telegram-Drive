@@ -6566,6 +6566,68 @@ fn release_targeted_peer_resolution_keeps_cache_readable_during_dialog_discovery
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn retained_session_release_keeps_http_alive_and_fences_account_replacement() {
+    let fixture = Fixture::new();
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let seed = |name| {
+        json!({
+            "command":"api_seed_catalog", "folders":[{"id":null,"name":"Saved Messages"}],
+            "complete":true, "files":[{"id":1,"folder":null,"name":name,"size":100,
+                "created":"2026-10-01T00:00:00Z","mime":"application/pdf"}],
+        })
+    };
+    app.ok(seed("Before.pdf"));
+    let token = "e".repeat(64);
+    let dav = app.ok(json!({"command":"start_webdav","token":token,
+        "catalogFixture":true,"retainSession":true}));
+    let url = format!(
+        "{}/dav/{token}/Saved%20Messages/",
+        dav["url"].as_str().unwrap()
+    );
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap();
+    let propfind = reqwest::Method::from_bytes(b"PROPFIND").unwrap();
+    let before = client
+        .request(propfind.clone(), &url)
+        .header("depth", "1")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(before.status(), 207);
+    assert!(before.text().await.unwrap().contains("Before.pdf"));
+    app.ok(json!({"command":"capture_account","owner":"101"}));
+    #[cfg(windows)]
+    {
+        assert!(app
+            .failure(json!({"command":"seed_account","owner":202}))
+            .contains("os error 32"));
+        assert_eq!(app.ok(json!({"command":"validate_account"})), true);
+    }
+    assert_eq!(app.ok(json!({"command":"release_retained_sessions"})), 1);
+    assert_eq!(app.ok(json!({"command":"validate_account"})), true);
+    app.ok(json!({"command":"seed_account","owner":202}));
+    assert!(app
+        .failure(json!({"command":"validate_account"}))
+        .contains("ACCOUNT_CHANGED"));
+    app.ok(seed("After.pdf"));
+    let after = client
+        .request(propfind, &url)
+        .header("depth", "1")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(after.status(), 207);
+    let body = after.text().await.unwrap();
+    assert!(body.contains("After.pdf"));
+    assert!(!body.contains("Before.pdf"));
+    drop(client);
+    app.stop();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn release_partial_catalog_serves_rest_and_dav_without_pruning_known_older_files() {
     let fixture = Fixture::new();
     let mut app = Backend::start(&fixture.0);
@@ -6665,6 +6727,16 @@ async fn release_partial_catalog_serves_rest_and_dav_without_pruning_known_older
         "an incomplete DAV listing must retain an older known entry"
     );
     app.ok(json!({"command":"capture_account","owner":"101"}));
+    #[cfg(windows)]
+    {
+        // Windows refuses replacing a database held by the disconnected runner.
+        // Keep the HTTP server alive while explicitly closing that fixture session.
+        assert!(app
+            .failure(json!({"command":"seed_account","owner":202}))
+            .contains("os error 32"));
+        assert_eq!(app.ok(json!({"command":"validate_account"})), true);
+        assert_eq!(app.ok(json!({"command":"release_retained_sessions"})), 1);
+    }
     app.ok(json!({"command":"seed_account","owner":202}));
     app.failure(json!({"command":"validate_account"}));
     let switched = client
@@ -6678,7 +6750,7 @@ async fn release_partial_catalog_serves_rest_and_dav_without_pruning_known_older
         .unwrap();
     assert!(
         !switched.contains("File%201.pdf") && !switched.contains("File%2050001.pdf"),
-        "A retained old session must not expose its account after replacement"
+        "The previous account must not be exposed after session replacement"
     );
     app.stop();
 }

@@ -1021,6 +1021,7 @@ struct Driver {
         actix_web::dev::ServerHandle,
         tokio::task::JoinHandle<std::io::Result<()>>,
     )>,
+    retained_sessions: Vec<Arc<TelegramState>>,
 }
 
 impl Driver {
@@ -1158,6 +1159,7 @@ impl Driver {
             | "api_seed_catalog"
             | "supporter_verify"
             | "start_webdav"
+            | "release_retained_sessions"
             | "start_api"
             | "start_http" => self.dispatch_servers(request).await,
             "peer_queued_clear" | "peer_scan_seed" | "peer_scan_start" | "peer_scan_read"
@@ -3639,6 +3641,7 @@ impl Driver {
                     let session = crate::workspace::open_session(&self.root).map_err(error)?;
                     crate::workspace::register_session(&self.root, &session)?;
                     *state.session.lock().await = Some(session);
+                    self.retained_sessions.push(state.clone());
                 }
                 let filesystem = crate::webdav::TelegramDavFs::new(
                     state,
@@ -3658,6 +3661,15 @@ impl Driver {
                 .map_err(error)?;
                 self.servers.push((server.handle(), tokio::spawn(server)));
                 Ok(json!({"url":format!("http://{address}")}))
+            }
+            "release_retained_sessions" => {
+                let mut released = 0;
+                for state in self.retained_sessions.drain(..) {
+                    if state.session.lock().await.take().is_some() {
+                        released += 1;
+                    }
+                }
+                Ok(json!(released))
             }
             "start_api" => {
                 // The REST API server exactly as the application serves it;
@@ -4752,6 +4764,7 @@ pub async fn run() -> Result<(), String> {
         guard: None,
         planned_sync: None,
         servers: Vec::new(),
+        retained_sessions: Vec::new(),
         archive_task: None,
         archive_continue: None,
         asset_downloads: Arc::new(AtomicU64::new(0)),
