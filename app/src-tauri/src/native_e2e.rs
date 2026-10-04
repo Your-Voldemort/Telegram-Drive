@@ -28,6 +28,9 @@ use std::{
 };
 use tokio::sync::{Mutex, RwLock};
 
+// Allow bounded source work while lifecycle journeys exercise notifications and retention.
+const INVENTORY_FIXTURE_RECONCILIATION: Duration = Duration::from_secs(30);
+
 fn error(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
@@ -2294,7 +2297,7 @@ impl Driver {
                 let timing = Timing {
                     poll: std::time::Duration::from_millis(30),
                     audit: std::time::Duration::from_millis(60),
-                    reconciliation: std::time::Duration::from_secs(1),
+                    reconciliation: INVENTORY_FIXTURE_RECONCILIATION,
                     retention: std::time::Duration::from_secs(2),
                     audit_window: std::time::Duration::from_secs(60),
                 };

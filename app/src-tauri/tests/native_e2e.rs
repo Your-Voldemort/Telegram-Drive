@@ -3580,6 +3580,42 @@ fn an_api_consumer_cannot_consume_the_desktop_inventory_change_notification() {
 }
 
 #[test]
+fn slow_api_inventory_reconciliation_preserves_desktop_change_notifications() {
+    let fixture = Fixture::new();
+    for (path, name, delay) in [
+        ("initial.json", "Original", 0),
+        ("changed.json", "Renamed elsewhere", 1100),
+        ("cold.json", "Idle", 0),
+    ] {
+        fixture.write(
+            path,
+            serde_json::to_vec(&json!({
+                "highwater": 1,
+                "rows": [{"id": 1, "name": name}],
+                "historyDelayMs": delay,
+            }))
+            .unwrap(),
+        );
+    }
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let result = app.ok(json!({
+        "command": "inventory_timer_lifecycle",
+        "owner": "101",
+        "initial": "initial.json",
+        "changed": "changed.json",
+        "cold": "cold.json",
+        "consumerBeforePoll": true,
+    }));
+    assert_eq!(result["unchangedEvents"], 0);
+    assert_eq!(result["changedEvents"], 1);
+    assert_eq!(result["changedName"], "Renamed elsewhere");
+    assert_eq!(result["coldName"], "Idle");
+    assert_eq!(result["coldLookupBatches"], 0);
+    app.stop();
+}
+
+#[test]
 fn inventory_twenty_small_folders_remain_monitored_without_count_based_eviction() {
     let fixture = Fixture::new();
     fixture.write(
