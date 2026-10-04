@@ -15,7 +15,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let root = std::env::current_exe()?
         .parent()
         .ok_or("Missing root")?
-        .to_path_buf();
+        .canonicalize()?;
     if std::fs::read_to_string(root.join(".native-e2e-fixture"))?
         != "telegram-drive-synthetic-e2e\n"
     {
@@ -46,7 +46,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     std::thread::sleep(Duration::from_millis(delay));
     if let Some(ready) = std::env::var_os("TD_E2E_CONVERSION_READY") {
         let ready = PathBuf::from(ready);
-        if ready.parent() != Some(root.as_path()) {
+        if parent(&ready)? != root {
             return Err("Ready outside fixture".into());
         }
         std::fs::write(ready, std::process::id().to_string())?;
@@ -88,7 +88,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         _ => {}
     }
     let output = PathBuf::from(args.last().ok_or("Missing output")?);
-    if !output.starts_with(&root) {
+    if !parent(&output)?.starts_with(&root) {
         return Err("Output outside fixture".into());
     }
     if mode.trim() == "oversize" {
@@ -119,8 +119,8 @@ fn complete() -> Result<(), Box<dyn std::error::Error>> {
     let root = std::env::current_exe()?
         .parent()
         .ok_or("Missing root")?
-        .to_path_buf();
-    if path.parent() != Some(root.as_path())
+        .canonicalize()?;
+    if parent(&path)? != root
         || std::fs::read_to_string(root.join(".native-e2e-fixture"))?
             != "telegram-drive-synthetic-e2e\n"
     {
@@ -138,7 +138,7 @@ fn complete() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(path, std::process::id().to_string())?;
     if let Some(ack) = std::env::var_os("TD_E2E_EXIT_ACK") {
         let ack = PathBuf::from(ack);
-        if ack.parent() != Some(root.as_path()) {
+        if parent(&ack)? != root {
             return Err("Acknowledgement outside fixture".into());
         }
         let until = std::time::Instant::now() + Duration::from_secs(120);
@@ -162,9 +162,16 @@ fn complete() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
+fn parent(path: &std::path::Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    Ok(path
+        .parent()
+        .ok_or("Missing output parent")?
+        .canonicalize()?)
+}
+
 fn video(root: &std::path::Path, args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(args.last().ok_or("Missing output")?);
-    if !output.starts_with(root) {
+    if !parent(&output)?.starts_with(root) {
         return Err("Output outside fixture".into());
     }
     let mode = std::fs::read_to_string(root.join("ffmpeg-mode"))?;
@@ -177,7 +184,7 @@ fn video(root: &std::path::Path, args: &[String]) -> Result<(), Box<dyn std::err
     std::thread::sleep(Duration::from_millis(delay));
     if let Some(path) = std::env::var_os("TD_E2E_VIDEO_READY") {
         let ready = PathBuf::from(path);
-        if ready.parent() != Some(root) {
+        if parent(&ready)? != root {
             return Err("Video readiness outside fixture".into());
         }
         std::fs::write(ready, std::process::id().to_string())?;

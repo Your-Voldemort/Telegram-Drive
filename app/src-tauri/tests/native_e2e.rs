@@ -8236,6 +8236,69 @@ fn heic_thumbnail_fallback_uses_a_full_primary_image_when_telegram_has_no_thumbn
     );
 }
 
+#[test]
+fn controlled_media_helper_accepts_equivalent_paths_and_refuses_outside_outputs() {
+    let fixture = Fixture::new();
+    let helper = fixture.path(if cfg!(windows) {
+        "heic-helper.exe"
+    } else {
+        "heic-helper"
+    });
+    std::fs::copy(env!("CARGO_BIN_EXE_native-e2e-heic-helper"), &helper).unwrap();
+    let alias = fixture.0.join("..").join(fixture.0.file_name().unwrap());
+    let probe = Command::new(&helper)
+        .arg("-version")
+        .env("TD_E2E_COMPLETE", alias.join("probe.complete"))
+        .output()
+        .unwrap();
+    assert!(
+        probe.status.success(),
+        "{}",
+        String::from_utf8_lossy(&probe.stderr)
+    );
+    assert!(String::from_utf8_lossy(&probe.stdout).contains("ffmpeg version 8.1.2"));
+    assert!(fixture.path("probe.complete").is_file());
+    fixture.write(
+        "heic-payload-480x360.jpg",
+        include_bytes!("../test-support/fixtures/heic/small-reference.jpg"),
+    );
+    let child = Command::new(&helper)
+        .args(["-s", "480x360"])
+        .arg(alias.join("display.jpg"))
+        .env("TD_E2E_CONVERSION_READY", alias.join("conversion.ready"))
+        .env("TD_E2E_COMPLETE", alias.join("conversion.complete"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let pid = child.id().to_string();
+    let conversion = child.wait_with_output().unwrap();
+    assert!(
+        conversion.status.success(),
+        "{}",
+        String::from_utf8_lossy(&conversion.stderr)
+    );
+    assert_eq!(fixture.read("conversion.ready"), pid.as_bytes());
+    assert_eq!(fixture.read("conversion.complete"), pid.as_bytes());
+    assert_eq!(
+        fixture.read("display.jpg"),
+        fixture.read("heic-payload-480x360.jpg")
+    );
+    let outside = Fixture::new();
+    let escaped = fixture
+        .0
+        .join("..")
+        .join(outside.0.file_name().unwrap())
+        .join("display.jpg");
+    let refused = Command::new(&helper)
+        .args(["-s", "480x360"])
+        .arg(escaped)
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+    assert!(!outside.path("display.jpg").exists());
+}
+
 fn heic_fixture() -> (Fixture, Backend) {
     let fixture = Fixture::new();
     fixture.write(
