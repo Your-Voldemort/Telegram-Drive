@@ -200,7 +200,9 @@ test('TV Escape exits native field editing and arrows can leave the field withou
   await number.press('Escape');await number.press('Enter');await number.press('ArrowUp');await expect(number).toHaveValue('3');
   await number.press('Escape');await number.press('ArrowRight');
   const select=page.getByRole('combobox',{name:'Native choice',exact:true});await expect(select).toBeFocused();
-  await select.press('ArrowDown');await select.press('s');await select.press('Enter');await expect(select).toHaveValue('b');
+  // Type-ahead has already selected the value. Enter can open a native picker
+  // on Linux Chromium, which consumes Escape before the field handler sees it.
+  await select.press('ArrowDown');await select.press('s');await expect(select).toHaveValue('b');
   await select.press('Escape');await select.press('ArrowDown');
   await expect(number).toBeFocused();
   await number.press('Escape');await number.press('Tab');await page.keyboard.press('Shift+Tab');
