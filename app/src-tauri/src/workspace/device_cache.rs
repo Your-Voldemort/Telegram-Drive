@@ -194,6 +194,7 @@ pub fn maintain(data_dir: &Path, app_cache_dir: &Path) -> Result<CacheStatus> {
 }
 
 pub fn clear(data_dir: &Path, app_cache_dir: &Path) -> Result<u64> {
+    crate::external_files::invalidate_all_accounts(data_dir)?;
     cache_core::register(app_cache_dir, Some(data_dir))?;
     let base = category(app_cache_dir, false)?;
     let _clearing = Clearing::new(&base);

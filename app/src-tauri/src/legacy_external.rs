@@ -4,7 +4,14 @@ use crate::{models::FileMetadata, workspace::store::WorkspaceFile};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
+#[derive(Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 enum Origin {
+    ProducedCache {
+        key: String,
+        name: String,
+        size: u64,
+        media_identity: String,
+    },
     Cache {
         key: String,
         thumbnail: bool,
@@ -15,13 +22,36 @@ enum Origin {
         key: String,
     },
 }
+#[derive(Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub(crate) struct Proof {
     origin: Origin,
 }
 impl Proof {
+    pub(crate) fn produced_cache(
+        key: String,
+        path: &Path,
+        size: u64,
+        media_identity: String,
+    ) -> Result<Self, String> {
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("Invalid cache filename")?
+            .into();
+        Ok(Self {
+            origin: Origin::ProducedCache {
+                key,
+                name,
+                size,
+                media_identity,
+            },
+        })
+    }
     pub(crate) fn matches_key(&self, expected: &str) -> bool {
         match &self.origin {
-            Origin::Cache { key, .. } | Origin::Offline { key, .. } => key == expected,
+            Origin::ProducedCache { key, .. }
+            | Origin::Cache { key, .. }
+            | Origin::Offline { key, .. } => key == expected,
         }
     }
 }
@@ -304,6 +334,20 @@ impl Proof {
         };
         let store = Store::open(&account.root, account.owner)?;
         let result = match &self.origin {
+            Origin::ProducedCache {
+                key,
+                name,
+                size,
+                media_identity,
+            } => {
+                let Some(directory) = cache_directory(account, cache, false, false)? else {
+                    return Ok(false);
+                };
+                current_allows(&store, key)?
+                    && store.record::<String>("asset-identity-v1", key)?.as_ref()
+                        == Some(media_identity)
+                    && exact_file(path, &directory, name, Some(*size))?
+            }
             Origin::Cache {
                 key,
                 thumbnail,
@@ -397,4 +441,58 @@ pub(crate) fn historical_preview(
     key: &str,
 ) -> Result<Option<PathBuf>, String> {
     Ok(historical_asset(account, cache, key, false)?.map(|(path, _)| path))
+}
+
+/// Hydrate proof for a previously registered disposable preview, including
+/// legitimate unindexed media. Stream metadata once; never inspect siblings' bytes.
+pub(crate) fn identify_registered(
+    account: &AccountGuard,
+    cache: &Path,
+    path: &Path,
+) -> Result<Option<Proof>, String> {
+    if let Some(proof) = identify(account, cache, path)? {
+        return Ok(Some(proof));
+    }
+    let Some(directory) = cache_directory(account, cache, false, false)? else {
+        return Ok(None);
+    };
+    if path.parent() != Some(directory.as_path()) {
+        return Ok(None);
+    }
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return Ok(None);
+    };
+    let Some((stem, extension)) = name.split_once('.') else {
+        return Ok(None);
+    };
+    if extension.is_empty()
+        || extension.len() > 12
+        || !extension.chars().all(|c| c.is_ascii_alphanumeric())
+    {
+        return Ok(None);
+    }
+    let store = Store::open(&account.root, account.owner)?;
+    let mut rows = store
+        .db
+        .prepare("SELECT id,value FROM workspace_records WHERE kind='asset-identity-v1'")
+        .map_err(|e| e.to_string())?;
+    while rows.next().map_err(|e| e.to_string())? == sqlite::State::Row {
+        let key = rows.read::<String, _>(0).map_err(|e| e.to_string())?;
+        let identity: String =
+            serde_json::from_str(&rows.read::<String, _>(1).map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?;
+        if format!(
+            "{:x}",
+            Sha256::digest(format!("raster-v2:{key}:{identity}:false").as_bytes())
+        ) != stem
+        {
+            continue;
+        }
+        let size = std::fs::symlink_metadata(path)
+            .map_err(|e| e.to_string())?
+            .len();
+        let proof = Proof::produced_cache(key, path, size, identity)?;
+        return Ok(proof.check(account, cache, path)?.then_some(proof));
+    }
+    Ok(None)
 }

@@ -15,6 +15,7 @@ use crate::sync_engine::{self, config as sync_config, policy::StoredPairPolicy};
 use crate::workspace::{store::Store, AccountGuard};
 use grammers_session::{storages::SqliteSession, types::PeerInfo, Session};
 use serde_json::{json, Value};
+use sha2::Digest;
 use std::time::Duration;
 use std::{
     collections::{HashMap, HashSet},
@@ -1030,6 +1031,7 @@ impl Driver {
             | "database_mode"
             | "database"
             | "seed_account"
+            | "account_validation_status"
             | "capture_account"
             | "validate_account"
             | "save_collection"
@@ -1047,6 +1049,9 @@ impl Driver {
             | "storage_insight_inventory"
             | "external_file_start"
             | "external_file_forget"
+            | "external_file_identity_mode"
+            | "external_file_old_registration"
+            | "external_file_identity_status"
             | "external_file_status"
             | "external_file_open"
             | "proxy_transport_fixture"
@@ -1400,12 +1405,19 @@ impl Driver {
                 })
                 .await
             }
+            "account_validation_status" => {
+                let counts = crate::workspace::test_account_validation_counts();
+                Ok(json!({"fallbackReads":counts.0,"validations":counts.1}))
+            },
             "seed_account" => {
                 let owner = request["owner"]
                     .as_i64()
                     .filter(|value| *value > 0)
                     .ok_or("Invalid fixture owner")?;
                 let root=if let Some(root)=request["root"].as_str() {child(&self.root,root)?} else {self.root.clone()};
+                if let Ok(previous) = crate::workspace::current_owner(&root) {
+                    if previous != owner { crate::external_files::invalidate_account(&root, previous)?; }
+                }
                 let path = root.join("telegram.session");
                 let staged = root.join(format!(".fixture-session-{}.sqlite", uuid::Uuid::new_v4()));
                 let prepared = (|| {
@@ -1653,6 +1665,43 @@ impl Driver {
                     .remove_record("external-produced-v1", &key)?;
                 Ok(json!(true))
             }
+            "external_file_old_registration" => {
+                let account = AccountGuard::open(&self.root, None)?;
+                let path = produced_fixture_path(&self.root, text(&request, "path")?)?;
+                let key = format!(
+                    "{:x}",
+                    sha2::Sha256::digest(path.to_string_lossy().as_bytes())
+                );
+                let store = Store::open(&self.root, account.owner)?;
+                let mut record = store
+                    .record::<Value>("external-produced-v1", &key)?
+                    .ok_or("No registration")?;
+                for name in ["reuse", "access"] {
+                    record
+                        .as_object_mut()
+                        .ok_or("Bad registration")?
+                        .remove(name);
+                }
+                for name in ["stable", "changed_nanos"] {
+                    record["identity"]
+                        .as_object_mut()
+                        .ok_or("Bad identity")?
+                        .remove(name);
+                }
+                store.put_record("external-produced-v1", &key, &record)?;
+                Ok(json!(true))
+            }
+            "external_file_identity_status" => {
+                let path = produced_fixture_path(&self.root, text(&request, "path")?)?;
+                Ok(
+                    json!({"eligible":crate::external_files::test_reuse_supported(&path)?,"bytes":std::fs::metadata(&path).map_err(error)?.len()}),
+                )
+            }
+            "external_file_identity_mode" => {
+                let path = produced_fixture_path(&self.root, text(&request, "path")?)?;
+                crate::external_files::test_unstable_identity(path, request["unstable"] == true);
+                Ok(json!(true))
+            }
             "external_file_status" => Ok(json!(crate::external_files::test_status())),
             "external_file_start" => {
                 let id = text(&request, "id")?.to_string();
@@ -1702,13 +1751,17 @@ impl Driver {
             }
             "external_file_open" => {
                 let account = AccountGuard::open(&self.root, None)?;
-                let path = crate::external_files::open_async(
+                let authenticated = crate::external_files::open_async(
                     account.clone(),
-                    self.root.join("asset-cache"),
+                    request["cacheRoot"]
+                        .as_str()
+                        .map(|path| child(&self.root, path).map(|root| root.join("asset-cache")))
+                        .transpose()?
+                        .unwrap_or_else(|| self.root.join("asset-cache")),
                     produced_fixture_path(&self.root, text(&request, "path")?)?,
                 )
-                .await?
-                .checked(&account)?;
+                .await?;
+                let path = authenticated.checked(&account)?;
                 std::fs::write(
                     self.root.join("opened-path"),
                     path.to_string_lossy().as_bytes(),
@@ -2401,7 +2454,7 @@ impl Driver {
                 ))
             }
             "heic_status" => Ok(
-                json!({"decodes":crate::heic::reports(), "processes":crate::process_budget::observations()}),
+                json!({"decodes":crate::heic::reports(), "processes":crate::process_budget::observations(),"decoderEntered":self.root.join("heic-pid").is_file()}),
             ),
             "asset_read" | "asset_display_read" | "asset_start" | "workspace_asset_read" => {
                 let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
@@ -2609,7 +2662,8 @@ impl Driver {
             "asset_clear_all" => {
                 let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
                 let cache = self.root.join("asset-cache");
-                crate::workspace::assets::clear_at(&cache, account.owner, "previews").await?;
+                crate::workspace::assets::clear_at(&self.root, &cache, account.owner, "previews")
+                    .await?;
                 crate::workspace::storage::clear_legacy_previews(&cache)?;
                 crate::workspace::device_cache::clear(&self.root, &cache)?;
                 account.validate()?;
@@ -2673,8 +2727,13 @@ impl Driver {
                     tokio::spawn(async move {
                         std::fs::write(signal, b"ready").map_err(error)?;
                         let cache = root.join("asset-cache");
-                        crate::workspace::assets::clear_at(&cache, account.owner, "previews")
-                            .await?;
+                        crate::workspace::assets::clear_at(
+                            &root,
+                            &cache,
+                            account.owner,
+                            "previews",
+                        )
+                        .await?;
                         crate::workspace::storage::clear_legacy_previews(&cache)?;
                         std::fs::write(root.join("legacy-clear.done"), b"done").map_err(error)?;
                         Ok(json!(true))
@@ -2969,6 +3028,7 @@ impl Driver {
             "asset_clear" => {
                 let account = AccountGuard::open(&self.root, Some(text(&request, "owner")?))?;
                 crate::workspace::assets::clear_at(
+                    &self.root,
                     &self.root.join("asset-cache"),
                     account.owner,
                     text(&request, "category")?,
@@ -3560,8 +3620,15 @@ impl Driver {
                 let address = listener.local_addr().map_err(error)?;
                 let staging = self.root.join("webdav-staging");
                 std::fs::create_dir_all(&staging).map_err(error)?;
+                let state = disconnected();
+                if request["retainSession"] == true {
+                    // Match a live runner's session lifetime, without a Telegram client.
+                    let session = crate::workspace::open_session(&self.root).map_err(error)?;
+                    crate::workspace::register_session(&self.root, &session)?;
+                    *state.session.lock().await = Some(session);
+                }
                 let filesystem = crate::webdav::TelegramDavFs::new(
-                    disconnected(),
+                    state,
                     self.bandwidth.clone(),
                     self.network.clone(),
                     request["writeEnabled"].as_bool().unwrap_or(false),

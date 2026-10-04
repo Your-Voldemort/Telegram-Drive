@@ -369,6 +369,11 @@ pub async fn cmd_logout(
         .ok()
         .and_then(|root| crate::workspace::current_owner(&root).ok());
     crate::workspace::suspend();
+    if let (Some(owner), Ok(root)) = (signing_out, app_handle.path().app_data_dir()) {
+        if let Err(error) = crate::external_files::invalidate_account(&root, owner) {
+            log::warn!("External hash reuse disabled at sign-out: {error}");
+        }
+    }
     crypto_state.lock();
 
     // 1. Revoke the Telegram authorization while the network runner is still

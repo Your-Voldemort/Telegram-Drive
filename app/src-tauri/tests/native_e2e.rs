@@ -101,7 +101,18 @@ impl Backend {
     fn ok_before(&mut self, request: Value, deadline: Duration) -> Value {
         let command = request["command"].as_str().unwrap_or("unknown").to_string();
         let reply = self.request_before(request, deadline);
-        assert_eq!(reply["ok"], true, "command={command}; reply={reply}");
+        let diagnostics = if reply["error"]
+            .as_str()
+            .is_some_and(|error| error.starts_with("HEIC_"))
+        {
+            self.request(json!({"command":"heic_status"}))
+        } else {
+            Value::Null
+        };
+        assert_eq!(
+            reply["ok"], true,
+            "command={command}; reply={reply}; diagnostics={diagnostics}"
+        );
         reply["value"].clone()
     }
     fn failure(&mut self, request: Value) -> String {
@@ -6414,7 +6425,9 @@ async fn release_partial_catalog_serves_rest_and_dav_without_pruning_known_older
     };
     app.ok(seed(1, 2, true));
     let token = "d".repeat(64);
-    let dav = app.ok(json!({"command":"start_webdav","token":token,"catalogFixture":true}));
+    let dav = app.ok(
+        json!({"command":"start_webdav","token":token,"catalogFixture":true,"retainSession":true}),
+    );
     let api = app.ok(json!({"command":"start_api","key":"partial-catalog-key"}));
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
@@ -6447,6 +6460,10 @@ async fn release_partial_catalog_serves_rest_and_dav_without_pruning_known_older
     let body: Value = response.json().await.unwrap();
     assert_eq!(body["complete"], false);
     assert_eq!(body["total"], 50000);
+    let before = app.ok(json!({"command":"account_validation_status"}));
+    let fallback_before = before["fallbackReads"].as_u64().unwrap();
+    let validations_before = before["validations"].as_u64().unwrap();
+    let body_started = Instant::now();
     let partial = client
         .request(propfind, &url)
         .header("depth", "1")
@@ -6454,11 +6471,45 @@ async fn release_partial_catalog_serves_rest_and_dav_without_pruning_known_older
         .await
         .unwrap();
     assert_eq!(partial.status(), 207);
-    let body = partial.text().await.unwrap();
+    let body = partial.text().await;
+    let after = app.ok(json!({"command":"account_validation_status"}));
+    let fallback_after = after["fallbackReads"].as_u64().unwrap();
+    let validations_after = after["validations"].as_u64().unwrap();
+    eprintln!(
+        "50k DAV body: {:.3}s, {} fallback SQLite session reads, {} account validations",
+        body_started.elapsed().as_secs_f64(),
+        fallback_after - fallback_before,
+        validations_after - validations_before
+    );
+    let body = body.unwrap();
+    assert_eq!(
+        fallback_after, fallback_before,
+        "A live runner retains its session connection"
+    );
+    assert!(
+        validations_after - validations_before >= 100_002,
+        "Every entry still validates its account"
+    );
     assert!(body.contains("File%2050001.pdf"));
     assert!(
         body.contains("File%201.pdf"),
         "an incomplete DAV listing must retain an older known entry"
+    );
+    app.ok(json!({"command":"capture_account","owner":"101"}));
+    app.ok(json!({"command":"seed_account","owner":202}));
+    app.failure(json!({"command":"validate_account"}));
+    let switched = client
+        .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &url)
+        .header("depth", "1")
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        !switched.contains("File%201.pdf") && !switched.contains("File%2050001.pdf"),
+        "A retained old session must not expose its account after replacement"
     );
     app.stop();
 }
@@ -7201,6 +7252,310 @@ fn release_small_storage_insights_include_older_inventory_and_reuse_generations(
     }
 }
 
+fn reuse_download() -> (Fixture, Backend) {
+    let fixture = Fixture::new();
+    fixture.write("original.part", b"verified file bytes");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    app.ok(json!({"command":"capture_account","owner":"101"}));
+    app.ok(json!({"command":"publish_download","source":"original.part","destination":"verified.bin","policy":"replace"}));
+    (fixture, app)
+}
+fn opening_hash_bytes(app: &mut Backend, path: &str, success: bool) -> u64 {
+    let before = app.ok(json!({"command":"external_file_status"}))[1]
+        .as_u64()
+        .unwrap();
+    let reply = app.request(json!({"command":"external_file_open","path":path}));
+    assert_eq!(reply["ok"], success, "{reply}");
+    app.ok(json!({"command":"external_file_status"}))[1]
+        .as_u64()
+        .unwrap()
+        - before
+}
+fn reuse_hash_bytes(app: &mut Backend, path: &str) -> u64 {
+    let status = app.ok(json!({"command":"external_file_identity_status","path":path}));
+    if status["eligible"] == true {
+        0
+    } else {
+        status["bytes"].as_u64().unwrap()
+    }
+}
+
+#[test]
+fn hash_reuse_unchanged_second_open_and_restart_dispatch_without_reading_contents() {
+    let (fixture, mut app) = reuse_download();
+    app.ok(json!({"command":"external_file_open","path":"verified.bin"}));
+    let opened = fixture.read("opened-path");
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", true),
+        reuse_hash_bytes(&mut app, "verified.bin")
+    );
+    assert_eq!(fixture.read("opened-path"), opened);
+    drop(app);
+    let mut app = Backend::start(&fixture.0);
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", true),
+        reuse_hash_bytes(&mut app, "verified.bin")
+    );
+    assert_eq!(fixture.read("opened-path"), opened);
+}
+#[test]
+fn hash_reuse_same_size_rewrite_with_restored_mtime_is_hashed_and_refused() {
+    let (fixture, mut app) = reuse_download();
+    let path = fixture.path("verified.bin");
+    let before = std::fs::metadata(&path).unwrap().modified().unwrap();
+    std::thread::sleep(Duration::from_millis(5));
+    std::fs::write(&path, vec![b'x'; b"verified file bytes".len()]).unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(before))
+        .unwrap();
+    assert_eq!(
+        std::fs::metadata(&path).unwrap().modified().unwrap(),
+        before
+    );
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", false),
+        b"verified file bytes".len() as u64
+    );
+    assert!(!fixture.path("opened-path").exists());
+}
+#[test]
+fn hash_reuse_rename_replacement_with_different_bytes_is_hashed_and_refused() {
+    let (fixture, mut app) = reuse_download();
+    fixture.write("replacement.bin", vec![b'x'; b"verified file bytes".len()]);
+    std::fs::rename(
+        fixture.path("replacement.bin"),
+        fixture.path("verified.bin"),
+    )
+    .unwrap();
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", false),
+        b"verified file bytes".len() as u64
+    );
+    assert!(!fixture.path("opened-path").exists());
+}
+#[cfg(unix)]
+#[test]
+fn hash_reuse_symlink_substitution_remains_refused_before_hashing() {
+    let (fixture, mut app) = reuse_download();
+    fixture.write("planted.bin", b"verified file bytes");
+    std::fs::remove_file(fixture.path("verified.bin")).unwrap();
+    std::os::unix::fs::symlink(fixture.path("planted.bin"), fixture.path("verified.bin")).unwrap();
+    assert_eq!(opening_hash_bytes(&mut app, "verified.bin", false), 0);
+    assert!(!fixture.path("opened-path").exists());
+}
+#[test]
+fn hash_reuse_changed_identity_matching_contents_refreshes_then_skips_the_hash() {
+    let (fixture, mut app) = reuse_download();
+    fixture.write("replacement.bin", b"verified file bytes");
+    std::fs::rename(
+        fixture.path("replacement.bin"),
+        fixture.path("verified.bin"),
+    )
+    .unwrap();
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", true),
+        b"verified file bytes".len() as u64
+    );
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", true),
+        reuse_hash_bytes(&mut app, "verified.bin")
+    );
+    drop(app);
+    let mut app = Backend::start(&fixture.0);
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", true),
+        reuse_hash_bytes(&mut app, "verified.bin")
+    );
+}
+#[test]
+fn hash_reuse_account_switch_away_and_back_requires_verification_again() {
+    let (_fixture, mut app) = reuse_download();
+    app.ok(json!({"command":"external_file_open","path":"verified.bin"}));
+    app.ok(json!({"command":"seed_account","owner":202}));
+    opening_hash_bytes(&mut app, "verified.bin", false);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", true),
+        b"verified file bytes".len() as u64
+    );
+    assert_eq!(
+        opening_hash_bytes(&mut app, "verified.bin", true),
+        reuse_hash_bytes(&mut app, "verified.bin")
+    );
+}
+#[test]
+fn hash_reuse_registered_legacy_cache_rechecks_protection_and_removal() {
+    for change in ["protection", "removal"] {
+        let fixture = Fixture::new();
+        fixture.write("legacy.bin", b"verified legacy file");
+        let mut app = Backend::start(&fixture.0);
+        app.ok(json!({"command":"seed_account","owner":101}));
+        let file = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","category":"offline"}));
+        app.ok(json!({"command":"external_file_open","path":file["path"]}));
+        std::fs::remove_file(fixture.path("opened-path")).unwrap();
+        if change == "protection" {
+            app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","updateOnly":true,"protection":"vault"}));
+        } else {
+            app.ok(json!({"command":"workspace_seed_files","owner":"101","files":[],"hidden":["saved:1"]}));
+        }
+        opening_hash_bytes(&mut app, file["path"].as_str().unwrap(), false);
+        assert!(!fixture.path("opened-path").exists());
+    }
+}
+#[test]
+fn hash_reuse_clear_cache_invalidates_a_pinned_survivor() {
+    let fixture = Fixture::new();
+    fixture.write("source.bin", b"cached preview bytes");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let file = app.ok(json!({"command":"asset_read","owner":"101","source":"source.bin"}));
+    let path = PathBuf::from(file["path"].as_str().unwrap());
+    let relative = path
+        .strip_prefix(fixture.0.canonicalize().unwrap())
+        .unwrap()
+        .to_string_lossy();
+    app.ok(json!({"command":"asset_pin","owner":"101","pinned":true}));
+    app.ok(json!({"command":"external_file_open","path":relative}));
+    assert_eq!(
+        opening_hash_bytes(&mut app, &relative, true),
+        reuse_hash_bytes(&mut app, &relative)
+    );
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+    assert!(path.is_file());
+    assert_eq!(
+        opening_hash_bytes(&mut app, &relative, true),
+        b"cached preview bytes".len() as u64
+    );
+    assert_eq!(
+        opening_hash_bytes(&mut app, &relative, true),
+        reuse_hash_bytes(&mut app, &relative)
+    );
+}
+#[test]
+fn hash_reuse_legacy_first_open_hashes_once_then_reuses() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"verified legacy file");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let file = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","category":"offline"}));
+    assert_eq!(
+        opening_hash_bytes(&mut app, file["path"].as_str().unwrap(), true),
+        b"verified legacy file".len() as u64
+            + reuse_hash_bytes(&mut app, file["path"].as_str().unwrap())
+    );
+    assert_eq!(
+        opening_hash_bytes(&mut app, file["path"].as_str().unwrap(), true),
+        reuse_hash_bytes(&mut app, file["path"].as_str().unwrap())
+    );
+}
+#[test]
+fn hash_reuse_unstable_identity_seam_hashes_every_open() {
+    let (_fixture, mut app) = reuse_download();
+    app.ok(json!({"command":"external_file_identity_mode","path":"verified.bin","unstable":true}));
+    for _ in 0..2 {
+        assert_eq!(
+            opening_hash_bytes(&mut app, "verified.bin", true),
+            b"verified file bytes".len() as u64
+        );
+    }
+}
+
+#[test]
+fn hash_reuse_old_registration_without_identity_or_proof_is_verified_before_upgrade() {
+    for cached in [false, true] {
+        let (fixture, mut app, path, bytes) = if cached {
+            let fixture = Fixture::new();
+            fixture.write("source.bin", b"cached preview bytes");
+            let mut app = Backend::start(&fixture.0);
+            app.ok(json!({"command":"seed_account","owner":101}));
+            let file = app.ok(json!({"command":"asset_read","owner":"101","source":"source.bin"}));
+            let path = PathBuf::from(file["path"].as_str().unwrap())
+                .strip_prefix(fixture.0.canonicalize().unwrap())
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            (fixture, app, path, b"cached preview bytes".len() as u64)
+        } else {
+            let (fixture, app) = reuse_download();
+            (
+                fixture,
+                app,
+                "verified.bin".into(),
+                b"verified file bytes".len() as u64,
+            )
+        };
+        app.ok(json!({"command":"external_file_old_registration","path":path}));
+        drop(app);
+        let mut app = Backend::start(&fixture.0);
+        assert_eq!(opening_hash_bytes(&mut app, &path, true), bytes);
+        assert_eq!(
+            opening_hash_bytes(&mut app, &path, true),
+            reuse_hash_bytes(&mut app, &path)
+        );
+    }
+}
+#[test]
+fn hash_reuse_handoff_rechecks_cache_epoch_and_protection_after_verification() {
+    for change in ["clear", "protection"] {
+        let fixture = Fixture::new();
+        fixture.write("legacy.bin", b"verified legacy file");
+        let mut app = Backend::start(&fixture.0);
+        app.ok(json!({"command":"seed_account","owner":101}));
+        let file = app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","category":"offline"}));
+        app.ok(json!({"command":"external_file_open","path":file["path"]}));
+        app.ok(json!({"command":"external_file_start","id":"handoff","path":file["path"],"legacy":true,"postHash":true}));
+        if change == "clear" {
+            app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+        } else {
+            app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","updateOnly":true,"protection":"vault"}));
+        }
+        fixture.write("file-handoff.release", b"go");
+        app.failure(json!({"command":"vault_prepare_finish","id":"handoff"}));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn hash_reuse_aliased_cache_root_cannot_bypass_old_registration_protection() {
+    let fixture = Fixture::new();
+    fixture.write("legacy.bin", b"verified legacy file");
+    let mut app = Backend::start(&fixture.0);
+    app.ok(json!({"command":"seed_account","owner":101}));
+    let file =
+        app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin"}));
+    app.ok(json!({"command":"external_file_open","path":file["path"]}));
+    app.ok(json!({"command":"external_file_old_registration","path":file["path"]}));
+    app.ok(json!({"command":"legacy_external_seed","owner":"101","source":"legacy.bin","updateOnly":true,"protection":"vault"}));
+    std::os::unix::fs::symlink(fixture.0.canonicalize().unwrap(), fixture.path("alias")).unwrap();
+    std::fs::remove_file(fixture.path("opened-path")).unwrap();
+    app.failure(json!({"command":"external_file_open","path":file["path"],"cacheRoot":"alias"}));
+    assert!(!fixture.path("opened-path").exists());
+}
+#[test]
+fn hash_reuse_heic_decoder_input_keeps_full_verification() {
+    let (fixture, mut app) = heic_fixture();
+    fixture.write("heic-mode", "wait");
+    let mut request = heic_request();
+    request["command"] = json!("asset_start");
+    request["display"] = json!(true);
+    app.ok(request);
+    wait_heic_process(&fixture);
+    let hashed = app.ok(json!({"command":"external_file_status"}))[1]
+        .as_u64()
+        .unwrap();
+    let size = fixture.read("synthetic.heic").len() as u64;
+    app.ok(json!({"command":"asset_abort"}));
+    app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
+    assert!(
+        hashed >= 2 * size,
+        "Production and pre-decode verification must both hash: {hashed}/{size}"
+    );
+}
+
 #[test]
 fn release_small_external_open_requires_an_app_produced_file_and_survives_restart() {
     let fixture = Fixture::new();
@@ -7525,7 +7880,8 @@ fn legacy_external_concurrent_first_opens_register_once_and_never_remigrate() {
     );
     assert_eq!(
         app.ok(json!({"command":"external_file_status"}))[1],
-        3 * b"concurrent recorded cache".len()
+        b"concurrent recorded cache".len() as u64
+            + 2 * reuse_hash_bytes(&mut app, path.as_str().unwrap())
     );
     app.ok(json!({"command":"external_file_forget","path":path}));
     app.failure(json!({"command":"external_file_open","path":path}));
@@ -7775,10 +8131,14 @@ fn heic_version_banners_gate_the_real_asset_pipeline_and_keep_original_actions()
             );
             assert!(fixture.path("heic-pid").is_file());
         } else {
-            assert!(reply["error"]
-                .as_str()
-                .unwrap()
-                .contains("HEIC_FFMPEG_VERSION_UNSUPPORTED"));
+            let diagnostics = app.ok(json!({"command":"heic_status"}));
+            assert!(
+                reply["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains("HEIC_FFMPEG_VERSION_UNSUPPORTED"),
+                "{version}: {reply}; diagnostics={diagnostics}"
+            );
             assert!(
                 !fixture.path("heic-pid").exists(),
                 "Refused version must not decode"

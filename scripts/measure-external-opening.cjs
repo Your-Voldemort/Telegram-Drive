@@ -12,13 +12,15 @@ const arguments_ = process.argv.slice(2);
 assert.equal(arguments_.length % 2, 0, 'Expected --driver PATH and/or --sizes BYTES,BYTES');
 const options = new Map();
 for (let index = 0; index < arguments_.length; index += 2) {
-  assert.ok(['--driver', '--sizes'].includes(arguments_[index]), 'Unknown option');
+  assert.ok(['--driver', '--sizes', '--expected-hashes'].includes(arguments_[index]), 'Unknown option');
   assert.ok(!options.has(arguments_[index]), 'Repeated option');
   options.set(arguments_[index], arguments_[index + 1]);
 }
 const executable = resolve(options.get('--driver') ?? join(__dirname, '../app/src-tauri/target/debug/native-e2e-driver'));
 const sizes = (options.get('--sizes') ?? '2000000000').split(',').map(Number);
 assert.ok(sizes.length > 0 && sizes.every(size => Number.isSafeInteger(size) && size > 0 && size <= 2_000_000_000));
+const expectedHashes = (options.get('--expected-hashes') ?? '2,1').split(',').map(Number);
+assert.ok(expectedHashes.length === 2 && expectedHashes.every(count => Number.isInteger(count) && count >= 0 && count <= 2));
 const root = fs.mkdtempSync(join(tmpdir(), 'telegram-drive-opening-measure-'));
 fs.chmodSync(root, 0o700);
 fs.writeFileSync(join(root, '.native-e2e-fixture'), 'telegram-drive-synthetic-e2e\n');
@@ -58,7 +60,7 @@ let driver;
         const seconds = (performance.now() - start) / 1000;
         const after = await request({ command: 'external_file_status' });
         const hashedBytes = after[1] - before[1];
-        assert.equal(hashedBytes, size * (label === 'first legacy open' ? 2 : 1));
+        assert.equal(hashedBytes, size * expectedHashes[label === 'first legacy open' ? 0 : 1]);
         measurements.push({ label, seconds, hashedBytes });
       }
       cases.push({ bytes: size, measurements });

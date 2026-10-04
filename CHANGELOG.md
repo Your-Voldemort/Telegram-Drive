@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Reuse verified digests for unchanged desktop files on eligible filesystems, across restart. Rehash changed identities before opening, preserve account and protection checks, and invalidate reuse on sign-out and Clear cache. Unsupported metadata retains full hashing.
+
 - Recognize numbered FFmpeg release banners with vendor suffixes and the lowercase `n` release prefix for desktop HEIC/HEIF previews. Keep the 8.1 minimum and refuse unversioned master builds without a capability claim; original-file actions remain available.
 
 - Translate authentication, encryption, desktop supporter recovery hints, onboarding, Help, shortcuts, privacy destinations and theme/settings arrays across all 24 catalogs. Finish copied-English translations in eleven large locales and ratchet only the two approved locale ceilings to the measured encoded sizes. Mobile follow-up changes remain local under the owner hook, and native language review remains required.

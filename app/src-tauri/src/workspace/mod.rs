@@ -1,4 +1,6 @@
 mod account;
+#[cfg(feature = "native-e2e")]
+pub(crate) use account::test_account_validation_counts;
 pub mod assets;
 pub(crate) mod cache_core;
 pub mod cleanup;

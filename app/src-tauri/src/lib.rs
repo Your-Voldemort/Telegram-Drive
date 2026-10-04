@@ -536,7 +536,7 @@ async fn cmd_open_file_externally(
             .app_data_dir()
             .map_err(|e| e.to_string())?;
         let account = crate::workspace::AccountGuard::open(&root, None)?;
-        let path = crate::external_files::open_async(
+        let authenticated = crate::external_files::open_async(
             account.clone(),
             _app_handle
                 .path()
@@ -544,8 +544,8 @@ async fn cmd_open_file_externally(
                 .map_err(|e| e.to_string())?,
             std::path::PathBuf::from(path),
         )
-        .await?
-        .checked(&account)?;
+        .await?;
+        let path = authenticated.checked(&account)?;
         _app_handle
             .opener()
             .open_path(path.to_string_lossy().into_owned(), None::<&str>)

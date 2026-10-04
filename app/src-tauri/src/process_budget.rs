@@ -213,6 +213,8 @@ pub(crate) fn run(
     check()?;
     #[cfg(feature = "native-e2e")]
     let command_name = command.get_program().to_string_lossy().into_owned();
+    #[cfg(feature = "native-e2e")]
+    let version_probe = command.get_args().any(|arg| arg == "-version");
     command.stdin(Stdio::null()).stderr(Stdio::null());
     command.stdout(if capture {
         Stdio::piped()
@@ -321,6 +323,7 @@ pub(crate) fn run(
             #[cfg(feature = "native-e2e")]
             observe(
                 &command_name,
+                version_probe,
                 &error,
                 running.child.id(),
                 Metrics {
@@ -350,6 +353,7 @@ pub(crate) fn run(
     #[cfg(feature = "native-e2e")]
     observe(
         &command_name,
+        version_probe,
         if success { "success" } else { "decoder_failed" },
         running.child.id(),
         Metrics {
@@ -373,6 +377,7 @@ pub(crate) fn run(
 #[derive(Clone, serde::Serialize)]
 pub(crate) struct Observation {
     executable: String,
+    version_probe: bool,
     outcome: String,
     pid: u32,
     metrics: Metrics,
@@ -381,12 +386,13 @@ pub(crate) struct Observation {
 static OBSERVATIONS: std::sync::LazyLock<std::sync::Mutex<Vec<Observation>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
 #[cfg(feature = "native-e2e")]
-fn observe(executable: &str, outcome: &str, pid: u32, metrics: Metrics) {
+fn observe(executable: &str, version_probe: bool, outcome: &str, pid: u32, metrics: Metrics) {
     OBSERVATIONS
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .push(Observation {
             executable: executable.into(),
+            version_probe,
             outcome: outcome.into(),
             pid,
             metrics,

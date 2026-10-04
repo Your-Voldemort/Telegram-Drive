@@ -307,12 +307,21 @@ pub(crate) fn cancel_request(account: &AccountGuard, id: &str) -> Result<bool, S
 
 pub async fn clear_owner(app: &tauri::AppHandle, owner: i64, category: &str) -> Result<(), String> {
     let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-    clear_at(&cache, owner, category).await
+    let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    clear_at(&root, &cache, owner, category).await
 }
-pub(crate) async fn clear_at(cache: &Path, owner: i64, category: &str) -> Result<(), String> {
+pub(crate) async fn clear_at(
+    root: &Path,
+    cache: &Path,
+    owner: i64,
+    category: &str,
+) -> Result<(), String> {
     cache_core::register(cache, None)?;
     if !["previews", "thumbnails", "staging"].contains(&category) {
         return Err("Unknown cache category".into());
+    }
+    if category != "staging" {
+        crate::external_files::invalidate_account(root, owner)?;
     }
     let categories = if category == "staging" {
         vec!["previews", "thumbnails"]
@@ -1533,7 +1542,14 @@ where
             .await
             .map_err(|e| e.to_string())??;
         if !thumbnail {
-            crate::external_files::register_async(account.clone(), target.clone()).await?;
+            crate::external_files::register_cache_async(
+                account.clone(),
+                target.clone(),
+                cache.clone(),
+                file.key.clone(),
+                identity.clone(),
+            )
+            .await?;
         }
         Ok(target.to_string_lossy().into_owned())
     };
@@ -2092,7 +2108,7 @@ pub(crate) async fn display_rendition_at(
     let source = original.clone();
     let record_key = key.clone();
     let flag = request.cancelled.clone();
-    let validated = crate::external_files::open_retained(
+    let validated = crate::external_files::verify_retained(
         account.clone(),
         cache.clone(),
         original.clone(),
