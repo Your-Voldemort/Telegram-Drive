@@ -4942,6 +4942,12 @@ fn heic_fixture_tools(root: &Path, request: &Value) -> Result<crate::heic::Tools
                         .unwrap_or(0)
                         .min(1000),
                     exit_failure: request["fixtureExitFailure"].as_bool().unwrap_or(false),
+                    sample_gate: (request["fixtureSampleGate"] == true).then(|| {
+                        (
+                            root.join("heic-sample.started"),
+                            root.join("heic-sample.release"),
+                        )
+                    }),
                 }),
             })
         }

@@ -8439,9 +8439,21 @@ fn heic_fixture() -> (Fixture, Backend) {
 fn heic_request() -> Value {
     json!({"command":"asset_display_read","owner":"101","source":"synthetic.heic","filename":"Synthetic.heic","extension":"heic","mime":"image/heic"})
 }
-fn wait_heic_process(fixture: &Fixture) {
+fn wait_heic_process(fixture: &Fixture) -> u32 {
     let deadline = Instant::now() + Duration::from_secs(300);
-    while !fixture.path("heic-ready").is_file() {
+    loop {
+        if let (Ok(ready), Ok(entered)) = (
+            std::fs::read_to_string(fixture.path("heic-ready")),
+            std::fs::read_to_string(fixture.path("heic-pid")),
+        ) {
+            if ready == entered {
+                if let Ok(pid) = ready.parse::<u32>() {
+                    if pid > 0 {
+                        return pid;
+                    }
+                }
+            }
+        }
         assert!(
             Instant::now() < deadline,
             "Controlled decoder did not start"
@@ -8686,6 +8698,82 @@ fn heic_reuse_pin_unpin_and_clear_preserve_the_original_relationship() {
     app.ok(json!({"command":"asset_clear","owner":"101","category":"previews"}));
     assert!(!rendition.exists());
 }
+struct HeicProcess {
+    pid: u32,
+    #[cfg(windows)]
+    handle: std::os::windows::io::OwnedHandle,
+}
+impl HeicProcess {
+    fn capture(pid: u32) -> Self {
+        #[cfg(windows)]
+        let handle = {
+            use std::os::windows::io::FromRawHandle;
+            use windows_sys::Win32::System::Threading::{
+                OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+            };
+            let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+            assert!(
+                !handle.is_null(),
+                "Cannot open decoder pid={pid}: {}",
+                std::io::Error::last_os_error()
+            );
+            unsafe { std::os::windows::io::OwnedHandle::from_raw_handle(handle) }
+        };
+        let process = Self {
+            pid,
+            #[cfg(windows)]
+            handle,
+        };
+        assert!(
+            process.alive().expect("Cannot query decoder"),
+            "Decoder pid={} must be live",
+            process.pid
+        );
+        process
+    }
+    fn alive(&self) -> std::io::Result<bool> {
+        #[cfg(unix)]
+        {
+            let pid = i32::try_from(self.pid).expect("Invalid decoder PID");
+            if unsafe { libc::kill(pid, 0) } == 0 {
+                return Ok(true);
+            }
+            let error = std::io::Error::last_os_error();
+            if error.raw_os_error() == Some(libc::ESRCH) {
+                return Ok(false);
+            }
+            Err(error)
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::AsRawHandle;
+            use windows_sys::Win32::System::Threading::GetExitCodeProcess;
+            let mut code = 0;
+            if unsafe { GetExitCodeProcess(self.handle.as_raw_handle(), &mut code) } == 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(code == 259)
+        }
+    }
+}
+struct HeicLifecycleCleanup<'a> {
+    app: &'a mut Backend,
+    fixture: &'a Fixture,
+    process: &'a HeicProcess,
+}
+impl Drop for HeicLifecycleCleanup<'_> {
+    fn drop(&mut self) {
+        // Release before any assertion unwinds into Backend's process teardown.
+        let _ = std::fs::write(self.fixture.path("heic-sample.release"), b"release");
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.app.request(json!({"command":"asset_abort"}))
+        }));
+        let until = Instant::now() + Duration::from_secs(30);
+        while !matches!(self.process.alive(), Ok(false)) && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
 #[test]
 fn heic_caller_abort_clear_and_account_change_terminate_the_decoder() {
     for operation in ["abort", "clear", "account"] {
@@ -8695,13 +8783,42 @@ fn heic_caller_abort_clear_and_account_change_terminate_the_decoder() {
         request["command"] = json!("asset_start");
         request["display"] = json!(true);
         request["requestId"] = json!("heic-lifecycle");
+        let sample_race = operation != "clear";
+        request["fixtureSampleGate"] = json!(sample_race);
+        if sample_race {
+            request["fixtureMonitorLoss"] = json!("before-completion");
+        }
         app.ok(request);
-        wait_heic_process(&fixture);
+        let pid = wait_heic_process(&fixture);
+        let process = HeicProcess::capture(pid);
+        let cleanup = HeicLifecycleCleanup {
+            app: &mut app,
+            fixture: &fixture,
+            process: &process,
+        };
+        let app = &mut *cleanup.app;
+        if sample_race {
+            let until = Instant::now() + Duration::from_secs(30);
+            while !std::fs::read_to_string(fixture.path("heic-sample.started"))
+                .is_ok_and(|value| value == pid.to_string())
+            {
+                assert!(Instant::now() < until, "Controlled RSS read did not start");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(
+                process
+                    .alive()
+                    .expect("Cannot query decoder during the RSS read"),
+                "Decoder remains live during the RSS read"
+            );
+        }
         if operation == "abort" {
             app.ok(json!({"command":"asset_abort"}));
+            fixture.write("heic-sample.release", b"release");
         }
         if operation == "account" {
             app.ok(json!({"command":"seed_account","owner":202}));
+            fixture.write("heic-sample.release", b"release");
             assert!(app
                 .failure(json!({"command":"asset_finish"}))
                 .contains("ACCOUNT_CHANGED"));
@@ -8715,15 +8832,38 @@ fn heic_caller_abort_clear_and_account_change_terminate_the_decoder() {
                 .contains("CANCELLED"));
         }
         let status = app.ok(json!({"command":"heic_status"}));
+        eprintln!("HEIC lifecycle operation={operation}; pid={pid}; status={status}");
         assert!(status["decodes"].as_array().unwrap().is_empty());
-        assert!(status["processes"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|item| item["outcome"] == "CANCELLED"
-                || item["outcome"]
-                    .as_str()
-                    .is_some_and(|v| v.contains("ACCOUNT_CHANGED"))));
+        assert!(
+            status["processes"].as_array().unwrap().iter().any(|item| {
+                item["pid"] == pid
+                    && (item["outcome"] == "CANCELLED"
+                        || item["outcome"]
+                            .as_str()
+                            .is_some_and(|v| v.contains("ACCOUNT_CHANGED")))
+            }),
+            "operation={operation}; pid={pid}; status={status}"
+        );
+        assert!(
+            !process.alive().expect("Cannot verify decoder termination"),
+            "Decoder must be dead after {operation}"
+        );
+        let directory = fixture.path("asset-cache/previews/workspace/101/previews");
+        assert!(
+            std::fs::read_dir(directory).unwrap().all(|entry| {
+                !matches!(
+                    entry.unwrap().path().extension().and_then(|v| v.to_str()),
+                    Some("jpg" | "part")
+                )
+            }),
+            "Cancelled decoder must not leave a rendition or partial"
+        );
+        let database = sqlite::open(fixture.path("workspace/101/workspace.db")).unwrap();
+        let mut query = database
+            .prepare("SELECT COUNT(*) FROM workspace_records WHERE kind='heic-rendition-v1'")
+            .unwrap();
+        query.next().unwrap();
+        assert_eq!(query.read::<i64, _>(0).unwrap(), 0);
     }
 }
 #[test]

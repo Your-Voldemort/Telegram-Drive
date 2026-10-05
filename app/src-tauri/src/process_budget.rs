@@ -235,6 +235,7 @@ pub(crate) struct FixtureClock {
     pub monitor_loss: Option<FixtureMonitorLoss>,
     pub exit_delay_ms: u64,
     pub exit_failure: bool,
+    pub sample_gate: Option<(std::path::PathBuf, std::path::PathBuf)>,
 }
 #[cfg(feature = "native-e2e")]
 pub(crate) fn run_fixture(
@@ -356,6 +357,8 @@ fn run_inner(
     #[cfg(feature = "native-e2e")]
     let mut sampler_seconds = 0.0;
     #[cfg(feature = "native-e2e")]
+    let mut sample_gate_used = false;
+    #[cfg(feature = "native-e2e")]
     let mut completed_exit_wait = false;
     #[cfg(feature = "native-e2e")]
     let spawn_seconds = started.elapsed().as_secs_f64();
@@ -390,6 +393,22 @@ fn run_inner(
                 return Ok(result);
             }
             #[cfg(feature = "native-e2e")]
+            if !sample_gate_used && clock_started.is_some() {
+                if let Some((started, release)) =
+                    fixture.and_then(|clock| clock.sample_gate.as_ref())
+                {
+                    sample_gate_used = true;
+                    // Hold a controlled RSS read while the real request is cancelled.
+                    // A missing release remains bounded and reaches normal containment.
+                    if std::fs::write(started, running.child.id().to_string()).is_ok() {
+                        let until = Instant::now() + Duration::from_secs(120);
+                        while !release.is_file() && Instant::now() < until {
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                    }
+                }
+            }
+            #[cfg(feature = "native-e2e")]
             let sampled = Instant::now();
             let refreshed = system.refresh_process(pid);
             #[cfg(feature = "native-e2e")]
@@ -415,6 +434,9 @@ fn run_inner(
             } else if let Some(result) = running.finish()? {
                 return Ok(result);
             } else {
+                // Cancellation can arrive during the RSS read. Preserve that
+                // reason before classifying a still-live child as unmonitored.
+                check()?;
                 #[cfg(feature = "native-e2e")]
                 if completed {
                     // No work remains in this controlled helper. Still collect its real
