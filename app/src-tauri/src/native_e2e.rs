@@ -478,6 +478,7 @@ struct InventoryRemote {
     lookup_error: bool,
     race: Option<Value>,
     delay_ms: u64,
+    history_gate: bool,
 }
 
 impl InventorySource {
@@ -498,6 +499,7 @@ impl InventorySource {
             lookup_error: data["lookupError"] == true,
             race: data.get("bootstrapRace").cloned(),
             delay_ms: data["historyDelayMs"].as_u64().unwrap_or(0),
+            history_gate: data["historyGate"] == true,
         });
         *self.cached.lock().map_err(error)? = Some(data.clone());
         Ok(data)
@@ -520,6 +522,16 @@ impl crate::file_inventory::Source<InventoryRow> for InventorySource {
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
             self.started.notify_one();
+            if data.history_gate {
+                let release = self.path.with_extension("release");
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+                while !release.is_file() {
+                    if tokio::time::Instant::now() >= deadline {
+                        return Err("Inventory fixture gate deadline".into());
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }
             if data.delay_ms > 0 {
                 tokio::time::sleep(std::time::Duration::from_millis(data.delay_ms)).await;
             }

@@ -3475,7 +3475,7 @@ fn account_changes_cancel_a_shared_inventory_job_and_leave_no_completed_old_owne
     fixture.write(
         "watch-old.json",
         serde_json::to_vec(
-            &json!({"highwater":1,"historyDelayMs":1000,"rows":[{"id":1,"name":"Old owner data"}]}),
+            &json!({"highwater":1,"historyGate":true,"rows":[{"id":1,"name":"Old owner data"}]}),
         )
         .unwrap(),
     );
@@ -3487,18 +3487,27 @@ fn account_changes_cancel_a_shared_inventory_job_and_leave_no_completed_old_owne
     let mut app = Backend::start(&fixture.0);
     app.ok(json!({"command":"seed_account","owner":101}));
     app.ok(json!({"command":"inventory_watch_start","owner":"101","source":"watch-old.json"}));
+    // Exceed the old delay while the remote history remains genuinely unfinished.
+    std::thread::sleep(Duration::from_millis(1200));
+    let inventory_rows = || {
+        let database = sqlite::open(fixture.path("workspace/101/workspace.db")).unwrap();
+        let mut query = database
+            .prepare("SELECT COUNT(*) FROM workspace_records WHERE kind='file-inventory-v1'")
+            .unwrap();
+        query.next().unwrap();
+        query.read::<i64, _>(0).unwrap()
+    };
+    assert_eq!(
+        inventory_rows(),
+        0,
+        "History must stay gated before the switch"
+    );
     app.ok(json!({"command":"seed_account","owner":202}));
+    fixture.write("watch-old.release", b"release");
     assert!(app
         .failure(json!({"command":"inventory_watch_finish"}))
         .contains("ACCOUNT_CHANGED"));
-    let database = sqlite::open(fixture.path("workspace/101/workspace.db")).unwrap();
-    let mut query = database
-        .prepare("SELECT COUNT(*) FROM workspace_records WHERE kind='file-inventory-v1'")
-        .unwrap();
-    query.next().unwrap();
-    assert_eq!(query.read::<i64, _>(0).unwrap(), 0);
-    drop(query);
-    drop(database);
+    assert_eq!(inventory_rows(), 0);
     let current =
         app.ok(json!({"command":"inventory_list","owner":"202","source":"watch-new.json"}));
     assert_eq!(current["rows"][0]["name"], "New owner data");
