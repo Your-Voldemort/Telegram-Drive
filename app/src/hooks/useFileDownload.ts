@@ -771,7 +771,7 @@ export function useFileDownload(
     const clearFinished = () => {
         if (!isCurrent()) return;
         if (!isAndroidPlatform) {
-            void clearTerminalTransfers('download', false, ownerId).catch(error => { if (isCurrent()) toast.error(userFacingError(error, t)); });
+            void clearTerminalTransfers('download', true, ownerId).catch(error => { if (isCurrent()) toast.error(userFacingError(error, t)); });
             return;
         }
         setDownloadQueue(q => q.filter(i => !ownsItem(i) || i.status !== 'success'));

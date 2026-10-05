@@ -229,7 +229,7 @@ export async function desktopFixture(page: Page, options: {
             return args.id ? targets[0] : targets;
           }
           if (options.populatedTransfers && command === 'cmd_transfer_clear_terminal') {
-            const ids=state.jobs.filter(job=>job.direction===args.direction && job.ownerId===args.ownerId && (job.status==='completed' || args.includeFailedAndCancelled && ['failed','cancelled'].includes(job.status))).map(job=>job.id);
+            const ids=state.jobs.filter(job=>!job.persistencePending && job.direction===args.direction && job.ownerId===args.ownerId && (job.status==='completed' || args.includeFailedAndCancelled && ['failed','cancelled'].includes(job.status))).map(job=>job.id);
             state.jobs=state.jobs.filter(job=>!ids.includes(job.id));for(const id of ids)state.emit('transfer-removed',id);return ids;
           }
           if (command === 'cmd_get_api_settings') return { enabled: options.networkEnabled ?? false, running: options.networkEnabled ?? false, port: 14201,key_set:true,last_error:null };
