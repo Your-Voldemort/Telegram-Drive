@@ -4886,9 +4886,18 @@ fn a_crashed_quota_hold_is_not_committed_or_double_charged_after_restart() {
 #[test]
 fn quota_rollover_keeps_admission_holds_and_late_cancellation_cannot_refund_new_usage() {
     let fixture = Fixture::new();
+    fixture.write(
+        "bandwidth.json",
+        json!({"date":"2026-09-28","up_bytes":0,"down_bytes":0,
+            "limit_bytes":131072,"period":"weekly"})
+        .to_string(),
+    );
     let mut app = Backend::start(&fixture.0);
+    let initial = app.ok(json!({"command":"bandwidth_set_date","date":"2026-10-04"}));
+    assert_eq!(initial["date"], "2026-09-28");
+    assert_eq!(initial["up_bytes"], 0);
+    assert_eq!(initial["down_bytes"], 0);
     app.ok(json!({"command":"bandwidth_set_limit","bytes":131072}));
-    app.ok(json!({"command":"bandwidth_set_date","date":"2026-10-04"}));
     app.ok(json!({"command":"bandwidth_hold","bytes":65536,"upload":true}));
     app.ok(json!({"command":"bandwidth_set_date","date":"2026-10-05"}));
     assert!(app
@@ -4957,9 +4966,18 @@ fn quota_can_shrink_an_admitted_hold_after_the_user_lowers_the_limit() {
 #[test]
 fn quota_backward_week_clock_does_not_reset_successful_usage() {
     let fixture = Fixture::new();
+    fixture.write(
+        "bandwidth.json",
+        json!({"date":"2026-10-05","up_bytes":0,"down_bytes":0,
+            "limit_bytes":131072,"period":"weekly"})
+        .to_string(),
+    );
     let mut app = Backend::start(&fixture.0);
+    let initial = app.ok(json!({"command":"bandwidth_set_date","date":"2026-10-05"}));
+    assert_eq!(initial["date"], "2026-10-05");
+    assert_eq!(initial["up_bytes"], 0);
+    assert_eq!(initial["down_bytes"], 0);
     app.ok(json!({"command":"bandwidth_set_limit","bytes":131072}));
-    app.ok(json!({"command":"bandwidth_set_date","date":"2026-10-05"}));
     app.ok(json!({"command":"bandwidth_commit_other","bytes":98304}));
     let reversed = app.ok(json!({"command":"bandwidth_set_date","date":"2026-10-04"}));
     assert_eq!(
